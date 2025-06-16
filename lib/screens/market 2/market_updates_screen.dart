@@ -1,358 +1,737 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_feather_icons/flutter_feather_icons.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:pull_to_refresh/pull_to_refresh.dart';
 
-class MarketUpdateScreen extends StatefulWidget {
+class MarketUpdatesScreen extends StatefulWidget {
   @override
-  _MarketUpdateScreenState createState() => _MarketUpdateScreenState();
+  _MarketUpdatesScreenState createState() => _MarketUpdatesScreenState();
 }
 
-class _MarketUpdateScreenState extends State<MarketUpdateScreen> {
-  final RefreshController _refreshController = RefreshController();
-  bool _isLoading = true;
-  String _errorMessage = '';
+class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
+    with TickerProviderStateMixin {
+  bool isLoading = true;
+  List<dynamic> topProducts = [];
+  List<dynamic> topSellers = [];
+  String errorMessage = '';
+  late AnimationController _animationController;
 
-  // API Endpoints
-  final String commodityApi = 'https://www.alphavantage.co/query?function=COMMODITIES&apikey=H2WGONWCSFD5EBHC';
-  final String newsApi = 'https://newsapi.org/v2/everything?q=agriculture&apiKey=80d9361201a841c39e9f5418dec247f8';
-
-  List<Map<String, dynamic>> commodities = [];
-  List<dynamic> news = [];
+  // AgriTech color scheme
+  static const Color primaryGreen = Color(0xFF2E7D32);
+  static const Color lightGreen = Color(0xFF66BB6A);
+  static const Color accentGreen = Color(0xFFE8F5E8);
+  static const Color darkGreen = Color(0xFF1B5E20);
+  static const Color backgroundColor = Color(0xFFF8FDF8);
+  static const Color cardColor = Colors.white;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
-  }
-
-  Future<void> _fetchData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      // Fetch commodity prices
-      final commodityResponse = await http.get(Uri.parse(commodityApi));
-      if (commodityResponse.statusCode == 200) {
-        final data = json.decode(commodityResponse.body);
-
-        // Parse Alpha Vantage response format
-        if (data['data'] != null) {
-          setState(() {
-            commodities = (data['data'] as List).map<Map<String, dynamic>>((item) {
-              return {
-                'name': item['name'] ?? 'Unknown',
-                'price': double.tryParse(item['value']?.toString() ?? '0') ?? 0.0,
-                'change': 0.0, // Alpha Vantage doesn't provide change percentage
-                'unit': 'per unit',
-                'date': item['date'] ?? 'N/A'
-              };
-            }).toList();
-          });
-        } else {
-          // Fallback to mock data if API response is unexpected
-          _useMockCommodityData();
-        }
-      } else {
-        _useMockCommodityData();
-      }
-
-      // Fetch agriculture news
-      final newsResponse = await http.get(Uri.parse(newsApi));
-      if (newsResponse.statusCode == 200) {
-        final newsData = json.decode(newsResponse.body);
-        setState(() {
-          news = newsData['articles'] ?? [];
-        });
-      } else {
-        _useMockNewsData();
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load data: ${e.toString()}';
-      });
-      _useMockData();
-    } finally {
-      setState(() => _isLoading = false);
-      _refreshController.refreshCompleted();
-    }
-  }
-
-  void _useMockCommodityData() {
-    setState(() {
-      commodities = [
-        {'name': 'Corn', 'price': 210.5, 'change': 1.2, 'unit': 'bushel', 'date': '2023-11-15'},
-        {'name': 'Wheat', 'price': 185.75, 'change': -0.8, 'unit': 'kg', 'date': '2023-11-15'},
-        {'name': 'Soybeans', 'price': 320.0, 'change': 2.1, 'unit': 'bushel', 'date': '2023-11-15'},
-      ];
-    });
-  }
-
-  void _useMockNewsData() {
-    setState(() {
-      news = [
-        {
-          'title': 'Global Wheat Prices Rise Due to Supply Concerns',
-          'description': 'Recent weather patterns have affected wheat yields in major producing regions.',
-          'urlToImage': 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae',
-          'publishedAt': '2023-11-15T10:30:00Z'
-        },
-        {
-          'title': 'New Sustainable Farming Practices Show Promise',
-          'description': 'Researchers demonstrate 20% yield increase with regenerative techniques.',
-          'urlToImage': 'https://images.unsplash.com/photo-1535254973040-607b474cb50d',
-          'publishedAt': '2023-11-14T08:15:00Z'
-        }
-      ];
-    });
-  }
-
-  void _useMockData() {
-    _useMockCommodityData();
-    _useMockNewsData();
-  }
-
-  void _onRefresh() {
-    _fetchData();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    fetchMarketUpdates();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
-      appBar: AppBar(
-        title: Text(
-          'Market Updates',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Color(0xFF2E7D32),
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: IconThemeData(color: Colors.white),
-      ),
-      body: SmartRefresher(
-        controller: _refreshController,
-        onRefresh: _onRefresh,
-        child: _isLoading
-            ? _buildShimmerLoader()
-            : _errorMessage.isNotEmpty
-            ? Center(child: Text(_errorMessage))
-            : _buildContent(),
-      ),
-    );
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
-  Widget _buildShimmerLoader() {
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: 5,
-      itemBuilder: (_, index) {
-        return Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            margin: EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            height: 120,
-          ),
+  Future<void> fetchMarketUpdates() async {
+    const baseUrl = 'http://10.0.2.2:3000/api/market';
+
+    try {
+      setState(() {
+        isLoading = true;
+        errorMessage = '';
+      });
+
+      final productResponse = await http.get(
+        Uri.parse('$baseUrl/top-products'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final sellerResponse = await http.get(
+        Uri.parse('$baseUrl/top-sellers'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (productResponse.statusCode == 200 && sellerResponse.statusCode == 200) {
+        setState(() {
+          topProducts = json.decode(productResponse.body);
+          topSellers = json.decode(sellerResponse.body);
+          isLoading = false;
+        });
+        _animationController.forward();
+      } else {
+        setState(() {
+          errorMessage = 'Unable to load market data. Please check your connection and try again.';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Network error. Please check your internet connection.';
+        isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildAnimatedContainer({
+    required Widget child,
+    required int delay,
+  }) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 500 + (delay * 100)),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, _) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - value)),
+          child: Opacity(opacity: value, child: child),
         );
       },
     );
   }
 
-  Widget _buildContent() {
-    return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        _buildSectionHeader('Today\'s Commodity Prices', FeatherIcons.trendingUp),
-        SizedBox(height: 8),
-        _buildCommodityList(),
-        SizedBox(height: 24),
-        _buildSectionHeader('Agriculture News', FeatherIcons.book),
-        SizedBox(height: 8),
-        _buildNewsList(),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Color(0xFF2E7D32)),
-        SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCommodityList() {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      elevation: 2,
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          children: commodities.map((commodity) => _buildCommodityItem(commodity)).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommodityItem(Map<String, dynamic> commodity) {
-    final priceChange = commodity['change'] ?? 0.0;
-    final isPositive = priceChange >= 0;
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        width: 40,
-        height: 40,
+  Widget _buildMarketInsightCard() {
+    return _buildAnimatedContainer(
+      delay: 0,
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Color(0xFF2E7D32).withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
+          gradient: LinearGradient(
+            colors: [primaryGreen, lightGreen],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: primaryGreen.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        child: Icon(
-          isPositive ? FeatherIcons.arrowUpRight : FeatherIcons.arrowDownRight,
-          color: isPositive ? Colors.green : Colors.red,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.trending_up,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    "Market Intelligence",
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Stay ahead of the market with real-time insights into trending products and top-performing sellers. Our market intelligence helps you make informed decisions about what to grow, when to sell, and who to connect with.",
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.9),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    color: Colors.white.withOpacity(0.8),
+                    size: 14,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Updated every hour",
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      title: Text(
-        commodity['name'],
-        style: GoogleFonts.poppins(
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
+    );
+  }
+
+  Widget _buildStatsCard(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey[800],
+              ),
+            ),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
-      subtitle: Text(
-        'Per ${commodity['unit']} (${DateFormat('MMM d').format(DateTime.parse(commodity['date']))}',
-        style: GoogleFonts.poppins(
-          fontSize: 12,
-          color: Color(0xFF666666),
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+    );
+  }
+
+  Widget _buildTopProducts() {
+    return _buildAnimatedContainer(
+      delay: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '\$${commodity['price'].toStringAsFixed(2)}',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.star, color: Colors.amber, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Trending Products',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: darkGreen,
+                  ),
+                ),
+              ],
             ),
           ),
-          Text(
-            '${isPositive ? '+' : ''}${priceChange.toStringAsFixed(2)}%',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: isPositive ? Colors.green : Colors.red,
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Most popular products in the marketplace right now',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
             ),
+          ),
+          const SizedBox(height: 16),
+          if (topProducts.isEmpty)
+            _buildEmptyState(
+              icon: Icons.shopping_cart_outlined,
+              title: "No trending products yet",
+              subtitle: "Be the first to list your products!",
+            )
+          else
+            ...topProducts.asMap().entries.map((entry) {
+              final index = entry.key;
+              final product = entry.value;
+              final p = product['Product'];
+              return _buildProductCard(p, index);
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductCard(Map<String, dynamic> product, int index) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Stack(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: accentGreen,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: product['images'] != null && product['images'].isNotEmpty
+                    ? Image.network(
+                  product['images'][0],
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      Icon(Icons.image_not_supported, color: Colors.grey[400]),
+                )
+                    : Icon(Icons.agriculture, color: primaryGreen, size: 28),
+              ),
+            ),
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.amber,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '#${index + 1}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          product['name'] ?? 'Unnamed Product',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[800],
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Text(
+                  product['market_region'] ?? 'Unknown Region',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: primaryGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            'XAF ${product['price'] ?? '0'}',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: primaryGreen,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopSellers() {
+    return _buildAnimatedContainer(
+      delay: 3,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.people, color: primaryGreen, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Top Performers',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: darkGreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Connect with the most successful sellers in your region',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (topSellers.isEmpty)
+            _buildEmptyState(
+              icon: Icons.person_outline,
+              title: "No top sellers yet",
+              subtitle: "Start selling to appear in this list!",
+            )
+          else
+            ...topSellers.asMap().entries.map((entry) {
+              final index = entry.key;
+              final seller = entry.value;
+              final u = seller['User'];
+              return _buildSellerCard(u, index);
+            }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellerCard(Map<String, dynamic> user, int index) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: accentGreen,
+              backgroundImage: user['profile_image'] != null && user['profile_image'].isNotEmpty
+                  ? NetworkImage(user['profile_image'])
+                  : null,
+              child: user['profile_image'] == null || user['profile_image'].isEmpty
+                  ? Icon(Icons.person, color: primaryGreen, size: 28)
+                  : null,
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: index < 3 ? Colors.amber : primaryGreen,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '#${index + 1}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          user['full_name'] ?? 'Anonymous Seller',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[800],
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.email, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    user['email'] ?? 'No email provided',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: primaryGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.star,
+            color: primaryGreen,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNewsList() {
-    return Column(
-      children: news.map((article) => _buildNewsItem(article)).toList(),
+  Widget _buildErrorState() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              "Unable to load market data",
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              errorMessage,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: fetchMarketUpdates,
+              icon: const Icon(Icons.refresh),
+              label: Text(
+                "Try Again",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildNewsItem(dynamic article) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        title: Text(
+          'Market Updates',
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: darkGreen,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios, color: darkGreen),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: darkGreen),
+            onPressed: fetchMarketUpdates,
+          ),
+        ],
       ),
-      elevation: 2,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          // Handle news article tap
-        },
-        child: Padding(
-          padding: EdgeInsets.all(12),
+      body: RefreshIndicator(
+        onRefresh: fetchMarketUpdates,
+        color: primaryGreen,
+        child: isLoading
+            ? const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+          ),
+        )
+            : errorMessage.isNotEmpty
+            ? _buildErrorState()
+            : SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (article['urlToImage'] != null)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    article['urlToImage'],
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 150,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.image, color: Colors.grey),
-                    ),
+              // Market Intelligence Card
+              _buildMarketInsightCard(),
+
+              // Stats Row
+              _buildAnimatedContainer(
+                delay: 1,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      _buildStatsCard(
+                        "Products",
+                        "${topProducts.length}",
+                        Icons.inventory,
+                        primaryGreen,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildStatsCard(
+                        "Sellers",
+                        "${topSellers.length}",
+                        Icons.people,
+                        lightGreen,
+                      ),
+                    ],
                   ),
                 ),
-              SizedBox(height: 8),
-              Text(
-                article['title'] ?? 'No title',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
               ),
-              SizedBox(height: 4),
-              Text(
-                article['description'] ?? 'No description',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Color(0xFF666666),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(FeatherIcons.clock, size: 14, color: Color(0xFF666666)),
-                  SizedBox(width: 4),
-                  Text(
-                    DateFormat('MMM d, y').format(DateTime.parse(article['publishedAt'])),
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                  Spacer(),
-                  Text(
-                    'Read more',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Color(0xFF2E7D32),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+
+              const SizedBox(height: 32),
+
+              // Top Products Section
+              _buildTopProducts(),
+
+              const SizedBox(height: 32),
+
+              // Top Sellers Section
+              _buildTopSellers(),
+
+              const SizedBox(height: 32),
             ],
           ),
         ),

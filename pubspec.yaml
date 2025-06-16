@@ -52,6 +52,7 @@ dependencies:
   flutter_speed_dial: ^7.0.0
   file_picker: ^8.0.7
   speech_to_text: ^7.0.0
+  flutter_launcher_icons: ^0.13.1
 
 
 
@@ -63,6 +64,11 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.jpg"
+
 flutter:
   uses-material-design: true
 
@@ -73,3 +79,5 @@ flutter:
     - assets/logo_icon.png
     - assets/subtle_farm_pattern.jpg
     - assets/google.png
+    - assets/logo.jpg
+

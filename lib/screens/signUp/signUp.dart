@@ -26,6 +26,9 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _addressController = TextEditingController();
+  String? _selectedAccountType; // 'buyer', 'seller', or 'author'
+
+  final List<String> _accountTypes = ['buyer', 'seller', 'author'];
 
   // Date of birth
   DateTime? _selectedDate;
@@ -165,8 +168,9 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
     required String address,
     required DateTime dateOfBirth,
     required File profileImage,
+    required String accountType,
   }) async {
-    final uri = Uri.parse('http://10.0.2.2:3000/api/users/register'); // replace with your IP
+    final uri = Uri.parse('http://10.0.2.2:3000/api/users/register');
 
     var request = http.MultipartRequest('POST', uri);
 
@@ -176,6 +180,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
     request.fields['password'] = password;
     request.fields['address'] = address;
     request.fields['date_of_birth'] = dateOfBirth.toIso8601String();
+    request.fields['account_type'] = accountType; // ✅ Add this line
 
     var imageFile = await http.MultipartFile.fromPath(
       'profile_image',
@@ -195,6 +200,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
     }
   }
 
+
   void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_profileImage == null) {
@@ -204,12 +210,13 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
         return;
       }
 
-      if (_selectedDate == null) {
+      if (_selectedAccountType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select your date of birth')),
+          SnackBar(content: Text('Please select an account type')),
         );
         return;
       }
+
 
       try {
         await registerUser(
@@ -220,6 +227,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
           address: _addressController.text.trim(),
           dateOfBirth: _selectedDate!,
           profileImage: _profileImage!,
+          accountType: _selectedAccountType!, // ✅ Pass it
         );
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -546,6 +554,67 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
                                     ),
                                   ),
                                   const SizedBox(height: 24),
+
+                                  // Account Type Dropdown
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.grey.withOpacity(0.1),
+                                          blurRadius: 5,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    padding: EdgeInsets.symmetric(horizontal: 16),
+                                    child: DropdownButtonFormField<String>(
+                                      value: _selectedAccountType,
+                                      items: _accountTypes.map((type) {
+                                        return DropdownMenuItem<String>(
+                                          value: type,
+                                          child: Text(
+                                            type[0].toUpperCase() + type.substring(1),
+                                            style: GoogleFonts.poppins(fontSize: 16),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _selectedAccountType = value;
+                                        });
+                                      },
+                                      decoration: InputDecoration(
+                                        labelText: 'Account Type',
+                                        labelStyle: GoogleFonts.poppins(color: Colors.grey.shade600),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(15),
+                                          borderSide: BorderSide.none,
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(15),
+                                          borderSide: BorderSide(color: Colors.grey.shade200, width: 1.5),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(15),
+                                          borderSide: BorderSide(color: _primaryGreen, width: 1.5),
+                                        ),
+                                        filled: true,
+                                        fillColor: Colors.grey.shade50,
+                                        prefixIcon: Icon(Icons.account_circle_outlined, color: _primaryGreen),
+                                      ),
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return 'Please select an account type';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+
 
                                   // Full Name Field
                                   _buildTextField(

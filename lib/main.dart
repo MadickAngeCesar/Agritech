@@ -5,6 +5,7 @@ import 'package:agritech/screens/profile/my_profile.dart';
 import 'package:agritech/screens/sign%20in/signIn.dart';
 import 'package:agritech/screens/signUp/signUp.dart';
 import 'package:agritech/screens/weather/weather.dart';
+import 'package:agritech/screens/welcome/welcome.dart';
 import 'package:agritech/services/api_service.dart';
 import 'package:agritech/services/auth_provider.dart';
 import 'package:agritech/services/cart_provider.dart';
@@ -57,7 +58,7 @@ class MyApp extends StatelessWidget {
           Theme.of(context).textTheme,
         ),
       ),
-      home: AuthScreen(),
+      home: WelcomeScreen(),
       routes: {
         '/signin':(context)=>AuthScreen(),
         '/signup': (context)=>SignUpScreen(),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:agritech/screens/market%202/market_updates_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
@@ -9,6 +10,7 @@ import '../chat forum/forum.dart';
 import '../market 2/market.dart';
 import '../market updates/marketupdates.dart';
 import '../navigation bar/navigation_bar.dart';
+import '../notifications/notifications.dart';
 
 // Search suggestion model
 class SearchSuggestion {
@@ -838,24 +840,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: accentGreen, width: 2),
-            ),
-            child: CircleAvatar(
-              radius: ResponsiveUtils.isDesktop(context) ? 26 : 22,
-              backgroundColor: softGreen,
-              child: Text(
-                widget.userData['name']?[0]?.toUpperCase() ?? 'U',
-                style: GoogleFonts.poppins(
-                  fontSize: ResponsiveUtils.getSubHeaderFontSize(context),
-                  fontWeight: FontWeight.w600,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NotificationScreen(userId: widget.userData['id'].toString()),
+                ),
+              );
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: accentGreen, width: 2),
+              ),
+              child: CircleAvatar(
+                radius: ResponsiveUtils.isDesktop(context) ? 26 : 22,
+                backgroundColor: softGreen,
+                child: Icon(
+                  Icons.notifications,
                   color: primaryGreen,
+                  size: ResponsiveUtils.isDesktop(context) ? 28 : 24,
                 ),
               ),
             ),
           ),
+
         ],
       ),
     );
@@ -1240,7 +1250,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => MarketTrendScreen(token: '',), // pass token if needed
+            builder: (_) => MarketUpdatesScreen(), // pass token if needed
           ),
         );
       },
