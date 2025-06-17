@@ -1,560 +1,838 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:google_fonts/google_fonts.dart';
 
 class AdvisoryScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
   final String token;
 
-  AdvisoryScreen({required this.userData, required this.token});
+  const AdvisoryScreen({
+    Key? key,
+    required this.userData,
+    required this.token,
+  }) : super(key: key);
 
   @override
-  _AdvisoryScreenState createState() => _AdvisoryScreenState();
+  State<AdvisoryScreen> createState() => _AdvisoryScreenState();
 }
 
-class _AdvisoryScreenState extends State<AdvisoryScreen> {
-  List<dynamic> allAdvisories = [];
-  String? selectedRegion;
-  String? selectedSoil;
-  String? selectedSeason;
-  dynamic resultAdvisory;
-  bool isLoading = true;
+class _AdvisoryScreenState extends State<AdvisoryScreen>
+    with TickerProviderStateMixin {
+  static const String _baseUrl = 'http://10.0.2.2:3000';
 
-  // Modern Agriculture Color Palette
-  static const Color primaryGreen = Color(0xFF2E7D32);
-  static const Color lightGreen = Color(0xFF4CAF50);
-  static const Color accentGreen = Color(0xFF66BB6A);
-  static const Color earthBrown = Color(0xFF8D6E63);
-  static const Color warmBeige = Color(0xFFF5F5DC);
-  static const Color softCream = Color(0xFFFAFAFA);
-  static const Color darkText = Color(0xFF2C3E50);
-  static const Color lightText = Color(0xFF5D6D7E);
+  bool _isLoading = false;
+  bool _isLoadingAdvisory = false;
+
+  List<String> _regions = [];
+  List<String> _seasons = [];
+  List<String> _soilTypes = [];
+
+  String? _selectedRegion;
+  String? _selectedSeason;
+  String? _selectedSoil;
+
+  Map<String, dynamic>? _advisoryData;
+
+  AnimationController? _fadeController;
+  AnimationController? _slideController;
+  Animation<double>? _fadeAnimation;
+  Animation<Offset>? _slideAnimation;
 
   @override
   void initState() {
     super.initState();
-    fetchAdvisoryData();
+    _initializeAnimations();
+    _loadDropdownData();
   }
 
-  Future<void> fetchAdvisoryData() async {
-    final response = await http.get(
-      Uri.parse('http://10.0.2.2:3000/api/advisory'),
-      headers: {'Authorization': 'Bearer ${widget.token}'},
+  void _initializeAnimations() {
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
     );
-    print("🔄 Fetching advisory data... Status: ${response.statusCode}");
-    if (response.statusCode == 200) {
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController!, curve: Curves.easeInOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController!, curve: Curves.easeOutCubic));
+
+    _fadeController!.forward();
+  }
+
+  Future<void> _loadDropdownData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/advisory'),
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _regions = List<String>.from(data['regions']);
+          _seasons = List<String>.from(data['seasons']);
+          _soilTypes = List<String>.from(data['soil_types']);
+        });
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to load dropdown data: $e');
+    } finally {
       setState(() {
-        allAdvisories = json.decode(response.body);
-        isLoading = false;
+        _isLoading = false;
       });
-    } else {
-      print("❌ Failed to fetch advisory data.");
-      throw Exception('Failed to load advisories');
     }
   }
 
-  Set<String> getUniqueRegions() =>
-      allAdvisories.map((e) => e['region'] as String).toSet();
-
-  Set<String> getUniqueSoils() => allAdvisories
-      .expand((e) => (e['common_soil_types'] as List<dynamic>).cast<String>())
-      .toSet();
-
-  Set<String> getUniqueSeasons() => allAdvisories
-      .expand((e) => (e['seasons'] as List<dynamic>).cast<String>())
-      .toSet();
-
-  Future<void> handleSubmit() async {
-    if (selectedRegion == null || selectedSeason == null) {
-      _showSnackBar('Please select at least region and season', isError: true);
+  Future<void> _getAdvisory() async {
+    if (_selectedRegion == null || _selectedSeason == null || _selectedSoil == null) {
+      _showErrorSnackBar('Please select all required fields');
       return;
     }
 
-    final response = await http.post(
-      Uri.parse('http://10.0.2.2:3000/api/advisory'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${widget.token}',
-      },
-      body: json.encode({
-        'region': selectedRegion,
-        'season': selectedSeason,
-        'soil_type': selectedSoil,
-      }),
-    );
+    setState(() {
+      _isLoadingAdvisory = true;
+    });
 
-    print("📤 Submitting advisory POST request...");
-    print("🧾 Payload: {region: $selectedRegion, season: $selectedSeason, soil: $selectedSoil}");
-    print("🔍 Response Status: ${response.statusCode}");
-    print("📦 Response Body: ${response.body}");
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/advisory'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'region': _selectedRegion,
+          'season': _selectedSeason,
+          'soil': _selectedSoil,
+        }),
+      );
 
-    if (response.statusCode == 200) {
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('Parsed data: $data');
+
+        setState(() {
+          _advisoryData = data;
+        });
+        if (_slideController != null) {
+          _slideController!.forward();
+        }
+      } else if (response.statusCode == 404) {
+        final errorData = json.decode(response.body);
+        print('404 Error data: $errorData');
+
+        String errorMessage = 'No advisory found for:\n';
+        errorMessage += 'Region: $_selectedRegion\n';
+        errorMessage += 'Season: $_selectedSeason\n';
+        errorMessage += 'Soil: $_selectedSoil\n\n';
+        errorMessage += 'Please try a different combination.';
+
+        _showErrorSnackBar(errorMessage);
+      } else {
+        _showErrorSnackBar('Failed to get advisory. Please try again.');
+      }
+    } catch (e) {
+      print('Network error: $e');
+      _showErrorSnackBar('Network error: Please check your connection');
+    } finally {
       setState(() {
-        resultAdvisory = json.decode(response.body);
+        _isLoadingAdvisory = false;
       });
-      _showSnackBar('Advisory recommendations loaded successfully!', isError: false);
-    } else {
-      _showSnackBar('No data found or request failed', isError: true);
     }
   }
 
-  void _showSnackBar(String message, {required bool isError}) {
+  void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        backgroundColor: isError ? Colors.red.shade600 : lightGreen,
+        content: Text(message),
+        backgroundColor: Colors.red.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.all(16),
       ),
     );
   }
 
-  Widget _buildModernDropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-    required IconData icon,
-  }) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String>(
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: GoogleFonts.poppins(
-            color: lightText,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-          prefixIcon: Container(
-            margin: EdgeInsets.all(12),
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: accentGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: primaryGreen, size: 20),
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
-        value: value,
-        items: items
-            .map((item) => DropdownMenuItem<String>(
-          value: item,
-          child: Text(
-            item,
-            style: GoogleFonts.poppins(
-              color: darkText,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ))
-            .toList(),
-        onChanged: onChanged,
-        dropdownColor: Colors.white,
-        style: GoogleFonts.poppins(color: darkText),
-      ),
-    );
-  }
-
-  Widget _buildSubmitButton() {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [primaryGreen, lightGreen],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: primaryGreen.withOpacity(0.3),
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: handleSubmit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Get Advisory',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResultCard() {
-    if (resultAdvisory == null) return SizedBox.shrink();
-
-    return Container(
-      margin: EdgeInsets.only(top: 24),
-      padding: EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: lightGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.agriculture, color: primaryGreen, size: 24),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Advisory Results',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: darkText,
-                      ),
-                    ),
-                    Text(
-                      'Recommendations for ${resultAdvisory['region']}',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: lightText,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          SizedBox(height: 24),
-
-          // Soil Match Status
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: resultAdvisory['matched_soil']
-                  ? lightGreen.withOpacity(0.1)
-                  : Colors.orange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: resultAdvisory['matched_soil']
-                    ? lightGreen.withOpacity(0.3)
-                    : Colors.orange.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  resultAdvisory['matched_soil']
-                      ? Icons.check_circle_outline
-                      : Icons.info_outline,
-                  color: resultAdvisory['matched_soil']
-                      ? lightGreen
-                      : Colors.orange,
-                  size: 20,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Soil Match: ${resultAdvisory['matched_soil'] ? 'Perfect Match' : 'Partial Match'}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: resultAdvisory['matched_soil']
-                        ? lightGreen
-                        : Colors.orange.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 20),
-
-          // Crop Recommendations
-          _buildInfoSection(
-            title: 'Recommended Crops',
-            icon: Icons.eco,
-            content: (resultAdvisory['crop_recommendations'] as List<dynamic>).join(", "),
-          ),
-
-          SizedBox(height: 16),
-
-          // Rotation Plan
-          _buildInfoSection(
-            title: 'Crop Rotation Plan',
-            icon: Icons.rotate_right,
-            content: (resultAdvisory['crop_rotation_plan'] as List<dynamic>).join("\n\n"),
-            isExpandable: true,
-          ),
-
-          SizedBox(height: 16),
-
-          // Advisory Notes
-          _buildInfoSection(
-            title: 'Advisory Notes',
-            icon: Icons.note_alt,
-            content: resultAdvisory['advisory_notes'],
-            isExpandable: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoSection({
-    required String title,
-    required IconData icon,
-    required String content,
-    bool isExpandable = false,
-  }) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: softCream,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentGreen.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: primaryGreen, size: 18),
-              SizedBox(width: 8),
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: darkText,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Text(
-            content,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: lightText,
-              fontWeight: FontWeight.w400,
-              height: 1.5,
-            ),
-            maxLines: isExpandable ? null : 3,
-            overflow: isExpandable ? null : TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    _fadeController?.dispose();
+    _slideController?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: softCream,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        title: Text(
+        title: const Text(
           'Agricultural Advisory',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: darkText,
+          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        backgroundColor: Colors.green.shade700,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: _fadeAnimation == null
+          ? const Center(child: CircularProgressIndicator())
+          : FadeTransition(
+        opacity: _fadeAnimation!,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildWelcomeCard(),
+              const SizedBox(height: 24),
+              _buildDebugCard(),
+              const SizedBox(height: 24),
+              _buildSelectionCard(),
+              const SizedBox(height: 24),
+              if (_advisoryData != null) _buildAdvisoryResults(),
+            ],
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: darkText, size: 20),
-          onPressed: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade600, Colors.green.shade800],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        actions: [
-          Container(
-            margin: EdgeInsets.only(right: 16),
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: lightGreen.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.agriculture, color: primaryGreen, size: 24),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade200,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      body: isLoading
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.agriculture, size: 32, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Welcome, ${widget.userData['name'] ?? 'Farmer'}!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
-                ],
+                ),
               ),
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-                strokeWidth: 3,
-              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Get personalized crop recommendations and financial advice based on your region, season, and soil type.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withOpacity(0.9),
+              height: 1.4,
             ),
-            SizedBox(height: 24),
-            Text(
-              'Loading Advisory Data...',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: lightText,
-              ),
-            ),
-          ],
-        ),
-      )
-          : SingleChildScrollView(
-        padding: EdgeInsets.all(20),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDebugCard() {
+    return Card(
+      elevation: 2,
+      color: Colors.blue.shade50,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Header
-            Container(
-              padding: EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryGreen.withOpacity(0.1), accentGreen.withOpacity(0.05)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue.shade700, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Quick Test Combinations',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: accentGreen.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Get Personalized Advice',
-                    style: GoogleFonts.poppins(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: darkText,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Select your farming parameters to receive tailored crop recommendations and rotation plans.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: lightText,
-                      fontWeight: FontWeight.w400,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-
-            SizedBox(height: 32),
-
-            // Form Section
-            _buildModernDropdown(
-              label: 'Select Region',
-              value: selectedRegion,
-              items: getUniqueRegions().toList(),
-              onChanged: (value) => setState(() => selectedRegion = value),
-              icon: Icons.location_on,
+            const SizedBox(height: 12),
+            _buildQuickSelectButton(
+              'Littoral + Long Rainy Season (Mar-Jul) + Clay Loam',
+              'Littoral',
+              'Long Rainy Season (Mar-Jul)',
+              'Clay Loam',
             ),
-
-            _buildModernDropdown(
-              label: 'Select Soil Type (Optional)',
-              value: selectedSoil,
-              items: getUniqueSoils().toList(),
-              onChanged: (value) => setState(() => selectedSoil = value),
-              icon: Icons.terrain,
+            const SizedBox(height: 8),
+            _buildQuickSelectButton(
+              'East + Long Rainy Season (Apr-Nov) + Ferralitic',
+              'East',
+              'Long Rainy Season (Apr-Nov)',
+              'Ferralitic',
             ),
-
-            _buildModernDropdown(
-              label: 'Select Season',
-              value: selectedSeason,
-              items: getUniqueSeasons().toList(),
-              onChanged: (value) => setState(() => selectedSeason = value),
-              icon: Icons.wb_sunny,
+            const SizedBox(height: 8),
+            _buildQuickSelectButton(
+              'Centre + Long Rainy Season (Mar-Jul) + Clay',
+              'Centre',
+              'Long Rainy Season (Mar-Jul)',
+              'Clay',
             ),
-
-            SizedBox(height: 8),
-
-            _buildSubmitButton(),
-
-            _buildResultCard(),
-
-            SizedBox(height: 24),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildQuickSelectButton(String label, String region, String season, String soil) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () {
+          setState(() {
+            _selectedRegion = region;
+            _selectedSeason = season;
+            _selectedSoil = soil;
+          });
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade100,
+          foregroundColor: Colors.blue.shade700,
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontSize: 12),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune, color: Colors.green.shade700, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Select Your Parameters',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildDropdown(
+              'Region',
+              _selectedRegion,
+              _regions,
+                  (value) => setState(() {
+                _selectedRegion = value;
+              }),
+              Icons.location_on,
+            ),
+            const SizedBox(height: 16),
+            _buildDropdown(
+              'Season',
+              _selectedSeason,
+              _seasons,
+                  (value) => setState(() {
+                _selectedSeason = value;
+              }),
+              Icons.wb_sunny,
+            ),
+            const SizedBox(height: 16),
+            _buildDropdown(
+              'Soil Type',
+              _selectedSoil,
+              _soilTypes,
+                  (value) => setState(() {
+                _selectedSoil = value;
+              }),
+              Icons.terrain,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoadingAdvisory ? null : _getAdvisory,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: _isLoadingAdvisory
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Text(
+                  'Get Advisory',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown(
+      String label,
+      String? value,
+      List<String> items,
+      ValueChanged<String?> onChanged,
+      IconData icon,
+      ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: value,
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon, color: Colors.green.shade600),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+            hint: Text('Select $label'),
+            items: items.map((item) {
+              return DropdownMenuItem<String>(
+                value: item,
+                child: Text(item),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdvisoryResults() {
+    if (_slideAnimation == null) {
+      return const SizedBox.shrink();
+    }
+
+    return SlideTransition(
+      position: _slideAnimation!,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCropRecommendationsCard(),
+          const SizedBox(height: 16),
+          _buildRotationPlansCard(),
+          const SizedBox(height: 16),
+          _buildFinancialAdviceCard(),
+          const SizedBox(height: 16),
+          _buildAdvisoryNotesCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCropRecommendationsCard() {
+    final crops = _advisoryData!['crop_recommendations'] as List;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.grass, color: Colors.green.shade700, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Recommended Crops',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: crops.map((crop) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    crop.toString(),
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRotationPlansCard() {
+    final rotationPlans = _advisoryData!['crop_rotation_plans'] as Map<String, dynamic>;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.autorenew, color: Colors.blue.shade700, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Crop Rotation Plans',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...rotationPlans.entries.map((entry) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.key,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...(entry.value as List).map((plan) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          plan.toString(),
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancialAdviceCard() {
+    final advisoryData = _advisoryData!;
+
+    if (!advisoryData.containsKey('financial_advice')) {
+      print('⚠️ financial_advice key missing from response');
+      return const SizedBox.shrink();
+    }
+
+    final financialAdvice = advisoryData['financial_advice'] as Map<String, dynamic>;
+    print('💰 Financial advice data: $financialAdvice');
+
+    if (!financialAdvice.containsKey('budget_thresholds') ||
+        !financialAdvice.containsKey('allocation_percentages')) {
+      print('⚠️ Required financial advice fields missing');
+      return const SizedBox.shrink();
+    }
+
+    final budgetThresholds = financialAdvice['budget_thresholds'] as List;
+    final allocation = financialAdvice['allocation_percentages'] as Map<String, dynamic>;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.monetization_on, color: Colors.orange.shade700, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Financial Advice',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Budget Recommendations',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...budgetThresholds.map((threshold) {
+              final min = threshold['min'];
+              final max = threshold['max'];
+              final advice = threshold['advice'];
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      max == null
+                          ? 'Over ${min.toString()} FCFA'
+                          : '${min.toString()} - ${max.toString()} FCFA',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      advice.toString(),
+                      style: TextStyle(color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            Text(
+              'Budget Allocation',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                children: allocation.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _capitalize(entry.key.toString()),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        Text(
+                          '${entry.value}%',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Savings Guidance',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Text(
+                financialAdvice['savings_guidance'].toString(),
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdvisoryNotesCard() {
+    if (_advisoryData!['advisory_notes'] == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.lightbulb, color: Colors.amber.shade700, size: 24),
+                const SizedBox(width: 8),
+                Text(
+                  'Advisory Notes',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Text(
+                _advisoryData!['advisory_notes'].toString(),
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  height: 1.4,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1);
   }
 }

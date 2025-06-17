@@ -47,11 +47,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
   final ScrollController _scrollController = ScrollController();
   AnimationController? _animationController;
   Animation<double>? _scaleAnimation;
+  late String accountType;
+
 
   @override
   void initState() {
     super.initState();
-
+    super.initState();
+    accountType = widget.userData['account_type'] ?? 'buyer'; // fallback
     // Initialize animation controller first
     _animationController = AnimationController(
       vsync: this,
@@ -670,7 +673,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
             },
           ),
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: accountType == 'seller'
+            ? FloatingActionButton(
           onPressed: () {
             Navigator.push(
               context,
@@ -701,7 +705,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: const Icon(Icons.add_rounded, size: 28),
-        ),
+        )
+            : null,
+
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: FarmConnectNavBar(
           isDarkMode: isDarkMode,

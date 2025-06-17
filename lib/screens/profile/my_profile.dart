@@ -1074,7 +1074,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                           );
                         },
                       ),
-
+                      MenuItemData(
+                        icon: Icons.camera_alt_outlined,
+                        title: "AI Advisory",
+                        subtitle: "AI-powered real time advice",
+                        iconColor: lightGreen,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => AdvisoryScreen(userData: {}, token: ''),
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
 
