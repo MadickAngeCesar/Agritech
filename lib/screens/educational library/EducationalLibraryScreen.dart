@@ -16,7 +16,7 @@ import 'model/category_model.dart';
 import 'model/ebook_model.dart';
 import 'model/video_model.dart';
 
-enum MenuItem { ebooks, videos, webinars, advisory }
+enum MenuItem {dashboard, ebooks, videos, webinars, advisory }
 
 class EducationalLibraryScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -51,7 +51,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   bool _isLoading = false;
   bool _isCategoriesLoading = false;
   String? _errorMessage;
-  MenuItem _selectedMenuItem = MenuItem.ebooks;
+  MenuItem _selectedMenuItem =  MenuItem.dashboard;
   bool _isSidebarCollapsed = true; // Always start collapsed
   bool _showCategoriesInSidebar = false;
 
@@ -399,6 +399,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   String _getSelectedMenuTitle() {
     switch (_selectedMenuItem) {
+      case MenuItem.dashboard:
+        return 'Dashboard Overview';
       case MenuItem.ebooks:
         return 'Digital Library - Ebooks';
       case MenuItem.videos:
@@ -412,6 +414,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   IconData _getSelectedMenuIcon() {
     switch (_selectedMenuItem) {
+      case MenuItem.dashboard:
+        return Icons.dashboard_rounded;
       case MenuItem.ebooks:
         return Icons.auto_stories;
       case MenuItem.videos:
@@ -571,6 +575,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         Expanded(
           child: Column(
             children: [
+              _buildCollapsedMenuItem(Icons.dashboard_rounded, MenuItem.dashboard),
+              const SizedBox(height: 16),
               _buildCollapsedMenuItem(Icons.auto_stories, MenuItem.ebooks),
               const SizedBox(height: 16),
               _buildCollapsedMenuItem(Icons.play_circle_filled, MenuItem.videos),
@@ -609,6 +615,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   Widget _buildCollapsedMenuItem(IconData icon, MenuItem menuItem) {
     final isSelected = _selectedMenuItem == menuItem;
+    // Remove this line: _buildCollapsedMenuItem(Icons.dashboard_rounded, MenuItem.dashboard);
 
     return Tooltip(
       message: _getMenuItemTitle(menuItem),
@@ -725,6 +732,13 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       letterSpacing: 1.0,
                     ),
                   ),
+                  _buildExpandedMenuItem(
+                    Icons.dashboard_rounded,
+                    'Dashboard',
+                    MenuItem.dashboard,
+                    'Overview & insights',
+                  ),
+
                   const SizedBox(height: 12),
 
                   _buildExpandedMenuItem(
@@ -1014,6 +1028,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   String _getMenuItemTitle(MenuItem menuItem) {
     switch (menuItem) {
+      case MenuItem.dashboard:
+        return 'Dashboard';
       case MenuItem.ebooks:
         return 'Ebooks';
       case MenuItem.videos:
@@ -1024,6 +1040,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         return 'Advisory';
     }
   }
+
 
   Widget _buildMainAppBar() {
     return Container(
@@ -1184,8 +1201,11 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         );
       case MenuItem.webinars:
       case MenuItem.advisory:
-      // Directly navigate - no content shown here
+
         return Container();
+      case MenuItem.dashboard:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 

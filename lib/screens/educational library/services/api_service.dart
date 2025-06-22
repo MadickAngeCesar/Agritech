@@ -391,4 +391,49 @@ class ApiService {
   }
 
 
+
+
+  Future<List<Video>> getRandomVideos() async {
+    try {
+      final response = await _get('videos/random-multiple');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => Video.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load random videos: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching random videos: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Ebook>> getRandomEbooks() async {
+    try {
+      final response = await _get('ebooks/random');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.map((json) => Ebook.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load random ebooks: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching random ebooks: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> getRandomWebinars() async {
+    try {
+      final response = await _get('webinars/random');
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as List<dynamic>;
+      }
+      throw Exception('Failed to load random webinars: ${response.statusCode}');
+    } catch (e) {
+      print('Error fetching random webinars: $e');
+      rethrow;
+    }
+  }
+
+
+
 }
