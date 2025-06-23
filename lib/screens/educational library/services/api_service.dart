@@ -397,8 +397,28 @@ class ApiService {
     try {
       final response = await _get('videos/random-multiple');
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final responseBody = json.decode(response.body);
+
+        // Handle both array and object responses
+        List<dynamic> data;
+        if (responseBody is List) {
+          data = responseBody;
+        } else if (responseBody is Map<String, dynamic>) {
+          // Check for common keys that might contain the video array
+          if (responseBody.containsKey('videos')) {
+            data = responseBody['videos'] as List<dynamic>;
+          } else if (responseBody.containsKey('data')) {
+            data = responseBody['data'] as List<dynamic>;
+          } else {
+            throw Exception('Unexpected response format for videos');
+          }
+        } else {
+          throw Exception('Invalid response format for videos');
+        }
+
         return data.map((json) => Video.fromJson(json)).toList();
+      } else if (response.statusCode == 404) {
+        return []; // Return empty list if no videos found
       }
       throw Exception('Failed to load random videos: ${response.statusCode}');
     } catch (e) {
@@ -407,12 +427,34 @@ class ApiService {
     }
   }
 
+
+
   Future<List<Ebook>> getRandomEbooks() async {
     try {
       final response = await _get('ebooks/random');
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final responseBody = json.decode(response.body);
+
+        // Handle both array and object responses
+        List<dynamic> data;
+        if (responseBody is List) {
+          data = responseBody;
+        } else if (responseBody is Map<String, dynamic>) {
+          // Check for common keys that might contain the ebook array
+          if (responseBody.containsKey('ebooks')) {
+            data = responseBody['ebooks'] as List<dynamic>;
+          } else if (responseBody.containsKey('data')) {
+            data = responseBody['data'] as List<dynamic>;
+          } else {
+            throw Exception('Unexpected response format for ebooks');
+          }
+        } else {
+          throw Exception('Invalid response format for ebooks');
+        }
+
         return data.map((json) => Ebook.fromJson(json)).toList();
+      } else if (response.statusCode == 404) {
+        return []; // Return empty list if no ebooks found
       }
       throw Exception('Failed to load random ebooks: ${response.statusCode}');
     } catch (e) {
@@ -421,11 +463,34 @@ class ApiService {
     }
   }
 
+
+
   Future<List<dynamic>> getRandomWebinars() async {
     try {
       final response = await _get('webinars/random');
       if (response.statusCode == 200) {
-        return json.decode(response.body) as List<dynamic>;
+        final responseBody = json.decode(response.body);
+
+        // Handle both array and object responses
+        List<dynamic> data;
+        if (responseBody is List) {
+          data = responseBody;
+        } else if (responseBody is Map<String, dynamic>) {
+          // Based on your controller, webinars are returned as { "webinars": [...] }
+          if (responseBody.containsKey('webinars')) {
+            data = responseBody['webinars'] as List<dynamic>;
+          } else if (responseBody.containsKey('data')) {
+            data = responseBody['data'] as List<dynamic>;
+          } else {
+            throw Exception('Unexpected response format for webinars. Expected "webinars" key.');
+          }
+        } else {
+          throw Exception('Invalid response format for webinars');
+        }
+
+        return data;
+      } else if (response.statusCode == 404) {
+        return []; // Return empty list if no webinars found
       }
       throw Exception('Failed to load random webinars: ${response.statusCode}');
     } catch (e) {
@@ -433,7 +498,6 @@ class ApiService {
       rethrow;
     }
   }
-
 
 
 }

@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../advisory/advisory.dart';
 import '../navigation bar/navigation_bar.dart';
 import '../webinar/user_webinar_screen.dart';
+import 'dashboard_section.dart';
 import 'model/category_model.dart';
 import 'model/ebook_model.dart';
 import 'model/video_model.dart';
@@ -1174,12 +1175,19 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
     );
   }
 
+  // Simply replace the _buildMainContent method in your existing file with this:
+
   Widget _buildMainContent() {
     if (_errorMessage != null) {
       return _buildErrorState();
     }
 
     switch (_selectedMenuItem) {
+      case MenuItem.dashboard:
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          child: MarketplaceDashboard(apiService: _apiService, isMobile: isMobile)
+        );
       case MenuItem.ebooks:
         return _buildContentWithCategories(
           child: EbookGrid(
@@ -1201,11 +1209,55 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         );
       case MenuItem.webinars:
       case MenuItem.advisory:
-
-        return Container();
-      case MenuItem.dashboard:
-        // TODO: Handle this case.
-        throw UnimplementedError();
+        return Container(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _selectedMenuItem == MenuItem.webinars
+                      ? Icons.video_call
+                      : Icons.support_agent,
+                  size: 64,
+                  color: AppColorss.primary.withOpacity(0.6),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _selectedMenuItem == MenuItem.webinars
+                      ? 'Webinars'
+                      : 'Advisory Services',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColorss.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _selectedMenuItem == MenuItem.webinars
+                      ? 'Navigate to this section from the sidebar'
+                      : 'Navigate to this section from the sidebar',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColorss.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      default:
+        return Container(
+          child: Center(
+            child: Text(
+              'Select a section from the sidebar',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                color: AppColorss.textSecondary,
+              ),
+            ),
+          ),
+        );
     }
   }
 

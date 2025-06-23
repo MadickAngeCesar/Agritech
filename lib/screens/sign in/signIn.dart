@@ -294,7 +294,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                               ),
                               child: ClipOval(
                                 child: Image.asset(
-                                  'assets/logo_icon.png',
+                                  'assets/logo.jpg',
                                   fit: BoxFit.cover,
                                 ),
                               ),

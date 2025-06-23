@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:agritech/models/review.dart';
+import 'package:agritech/screens/FAQ/faq.dart';
 import 'package:agritech/screens/advisory/advisory.dart';
 import 'package:agritech/screens/contact%20us/contact%20us.dart';
 import 'package:agritech/screens/ebooks/ebooks.dart';
 import 'package:agritech/screens/educational%20library/EducationalLibraryScreen.dart';
+import 'package:agritech/screens/reviewds/reviews.dart';
 import 'package:agritech/screens/video/videoTips.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1021,7 +1024,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       MenuItemData(
                         icon: Icons.smart_toy_outlined,
-                        title: "FAQ & Chat Bot",
+                        title: "Chat Bot",
                         subtitle: "get a tour an dhelp around your app",
                         onTap: () {
                           Navigator.push(
@@ -1044,6 +1047,32 @@ class _ProfileScreenState extends State<ProfileScreen>
                             context,
                             MaterialPageRoute(
                               builder: (_) => EducationalLibraryScreen(userData: {}, token: '',),
+                            ),
+                          );
+                        },
+                      ),
+                      MenuItemData(
+                        icon: Icons.library_books_outlined,
+                        title: "Review",
+                        subtitle: "Help us better our services",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FeedbackScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      MenuItemData(
+                        icon: Icons.library_books_outlined,
+                        title: "FAQ",
+                        subtitle: "Check out our frequently asked questions",
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FAQSection(),
                             ),
                           );
                         },
