@@ -2,20 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 
 class MarketUpdatesScreen extends StatefulWidget {
   @override
-  _MarketUpdatesScreenState createState() => _MarketUpdatesScreenState();
+  State<MarketUpdatesScreen> createState() => _MarketUpdatesScreenState();
 }
 
 class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
     with TickerProviderStateMixin {
-  bool isLoading = true;
-  List<dynamic> topProducts = [];
-  List<dynamic> topSellers = [];
-  String errorMessage = '';
-  late AnimationController _animationController;
-
   // AgriTech color scheme
   static const Color primaryGreen = Color(0xFF2E7D32);
   static const Color lightGreen = Color(0xFF66BB6A);
@@ -24,6 +20,27 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
   static const Color backgroundColor = Color(0xFFF8FDF8);
   static const Color cardColor = Colors.white;
 
+  // Loading states
+  bool isLoadingCategories = true;
+  bool isLoadingChart = false;
+  bool isLoadingMarketData = true;
+
+  // Market data
+  List<dynamic> categories = [];
+  List<dynamic> topProducts = [];
+  List<dynamic> topSellers = [];
+  String errorMessage = '';
+
+  // Chart data
+  String? selectedCategoryId;
+  DateTime? selectedFrom;
+  DateTime? selectedTo;
+  List<String> chartDates = [];
+  List<double> chartPrices = [];
+
+  // Animation
+  late AnimationController _animationController;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +48,9 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+
+    // Initialize data
+    fetchCategories();
     fetchMarketUpdates();
   }
 
@@ -40,12 +60,86 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
     super.dispose();
   }
 
+  // API calls
+  Future<void> fetchCategories() async {
+    try {
+      setState(() {
+        isLoadingCategories = true;
+      });
+
+      final res = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/categories'),
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() {
+          categories = data;
+          isLoadingCategories = false;
+        });
+      } else {
+        setState(() {
+          isLoadingCategories = false;
+        });
+        print('Failed to load categories');
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingCategories = false;
+      });
+      print('Error loading categories: $e');
+    }
+  }
+
+  Future<void> fetchChartData() async {
+    if (selectedCategoryId == null || selectedFrom == null || selectedTo == null) {
+      return;
+    }
+
+    setState(() {
+      isLoadingChart = true;
+    });
+
+    final fromStr = DateFormat('yyyy-MM-dd').format(selectedFrom!);
+    final toStr = DateFormat('yyyy-MM-dd').format(selectedTo!);
+
+    try {
+      final res = await http.get(
+        Uri.parse(
+          'http://10.0.2.2:3000/api/market/category-trend?category_id=$selectedCategoryId&from=$fromStr&to=$toStr',
+        ),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() {
+          chartDates = List<String>.from(data['dates']);
+          chartPrices = List<double>.from(
+            data['avg_prices'].map((e) => (e as num).toDouble()),
+          );
+          isLoadingChart = false;
+        });
+      } else {
+        setState(() {
+          isLoadingChart = false;
+        });
+        print('Failed to load chart data');
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingChart = false;
+      });
+      print('Error loading chart data: $e');
+    }
+  }
+
   Future<void> fetchMarketUpdates() async {
     const baseUrl = 'http://10.0.2.2:3000/api/market';
 
     try {
       setState(() {
-        isLoading = true;
+        isLoadingMarketData = true;
         errorMessage = '';
       });
 
@@ -63,23 +157,51 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
         setState(() {
           topProducts = json.decode(productResponse.body);
           topSellers = json.decode(sellerResponse.body);
-          isLoading = false;
+          isLoadingMarketData = false;
         });
         _animationController.forward();
       } else {
         setState(() {
           errorMessage = 'Unable to load market data. Please check your connection and try again.';
-          isLoading = false;
+          isLoadingMarketData = false;
         });
       }
     } catch (e) {
       setState(() {
         errorMessage = 'Network error. Please check your internet connection.';
-        isLoading = false;
+        isLoadingMarketData = false;
       });
     }
   }
 
+  Future<void> refreshAll() async {
+    await Future.wait([
+      fetchCategories(),
+      fetchMarketUpdates(),
+    ]);
+  }
+
+  // Date picker
+  Future<void> _pickDate(BuildContext context, bool isFrom) async {
+    final initialDate = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2026),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          selectedFrom = picked;
+        } else {
+          selectedTo = picked;
+        }
+      });
+    }
+  }
+
+  // UI Components
   Widget _buildAnimatedContainer({
     required Widget child,
     required int delay,
@@ -137,7 +259,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    "Market Intelligence",
+                    "Market Intelligence Hub",
                     style: GoogleFonts.poppins(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -149,7 +271,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              "Stay ahead of the market with real-time insights into trending products and top-performing sellers. Our market intelligence helps you make informed decisions about what to grow, when to sell, and who to connect with.",
+              "Comprehensive market insights combining real-time trends, top performers, and price analytics to help you make informed agricultural business decisions.",
               style: GoogleFonts.poppins(
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.9),
@@ -157,31 +279,62 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
               ),
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    color: Colors.white.withOpacity(0.8),
-                    size: 14,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Updated every hour",
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.8),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Live Data",
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.analytics,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Analytics",
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -234,6 +387,446 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Market Trends Tab Components
+  Widget _buildTrendsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Price Trend Analysis",
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: darkGreen,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Analyze price trends for specific product categories over time",
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildCategoryDropdown(),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildDateSelector("From Date", selectedFrom, true),
+              const SizedBox(width: 12),
+              _buildDateSelector("To Date", selectedTo, false),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: ElevatedButton.icon(
+              onPressed: (selectedCategoryId != null &&
+                  selectedFrom != null &&
+                  selectedTo != null) ? fetchChartData : null,
+              icon: Icon(Icons.show_chart),
+              label: Text(
+                "Generate Trend Chart",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildChart(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    if (isLoadingCategories) {
+      return Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Center(
+          child: CircularProgressIndicator(color: primaryGreen, strokeWidth: 2),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: DropdownButtonFormField<String>(
+        value: selectedCategoryId,
+        decoration: InputDecoration(
+          labelText: "Select Product Category",
+          prefixIcon: Icon(Icons.category, color: primaryGreen),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: cardColor,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        items: categories.map<DropdownMenuItem<String>>((cat) {
+          return DropdownMenuItem<String>(
+            value: cat['id'].toString(),
+            child: Text(
+              cat['name'],
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedCategoryId = value;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateSelector(String label, DateTime? selected, bool isFrom) {
+    return Expanded(
+      child: InkWell(
+        onTap: () => _pickDate(context, isFrom),
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.calendar_today, size: 18, color: primaryGreen),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      selected != null
+                          ? DateFormat('MMM dd, yyyy').format(selected)
+                          : 'Select date',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: selected != null ? Colors.grey[800] : Colors.grey[500],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChart() {
+    if (isLoadingChart) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: primaryGreen),
+              SizedBox(height: 16),
+              Text(
+                "Generating trend analysis...",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (chartDates.isEmpty) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.show_chart, size: 64, color: Colors.grey[400]),
+              SizedBox(height: 16),
+              Text(
+                "No trend data available",
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Select a category and date range to view price trends",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.trending_up, color: primaryGreen, size: 24),
+              SizedBox(width: 8),
+              Text(
+                "Price Trend Analysis",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: darkGreen,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            "Average prices over selected period",
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          SizedBox(height: 24),
+          AspectRatio(
+            aspectRatio: 1.6,
+            child: BarChart(
+              BarChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: chartPrices.isNotEmpty
+                      ? (chartPrices.reduce((a, b) => a > b ? a : b) / 5)
+                      : 1,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey.shade200,
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < chartDates.length) {
+                          return Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text(
+                              DateFormat('MM/dd').format(DateTime.parse(chartDates[index])),
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey.shade600,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        }
+                        return SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          'XAF ${value.toInt()}',
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey.shade600,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: List.generate(chartPrices.length, (i) {
+                  return BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: chartPrices[i],
+                        width: 16,
+                        color: primaryGreen,
+                        borderRadius: BorderRadius.circular(4),
+                      )
+                    ],
+                  );
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Market Overview Tab Components
+  Widget _buildOverviewTab() {
+    if (isLoadingMarketData) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+        ),
+      );
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return _buildErrorState();
+    }
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats Row
+          _buildAnimatedContainer(
+            delay: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  _buildStatsCard(
+                    "Trending Products",
+                    "${topProducts.length}",
+                    Icons.inventory,
+                    primaryGreen,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatsCard(
+                    "Top Sellers",
+                    "${topSellers.length}",
+                    Icons.people,
+                    lightGreen,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildStatsCard(
+                    "Categories",
+                    "${categories.length}",
+                    Icons.category,
+                    Colors.orange,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Top Products Section
+          _buildTopProducts(),
+
+          const SizedBox(height: 32),
+
+          // Top Sellers Section
+          _buildTopSellers(),
+
+          const SizedBox(height: 32),
+        ],
       ),
     );
   }
@@ -630,7 +1223,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: fetchMarketUpdates,
+              onPressed: refreshAll,
               icon: const Icon(Icons.refresh),
               label: Text(
                 "Try Again",
@@ -653,85 +1246,73 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        title: Text(
-          'Market Updates',
-          style: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: darkGreen,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.white,
+          title: Text(
+            'Market Intelligence',
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: darkGreen,
+            ),
+          ),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios, color: darkGreen),
+            onPressed: () => Navigator.pop(context),
+          ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.refresh, color: darkGreen),
+              onPressed: refreshAll,
+            ),
+          ],
+          bottom: TabBar(
+            labelColor: primaryGreen,
+            unselectedLabelColor: Colors.grey[600],
+            indicatorColor: primaryGreen,
+            indicatorWeight: 3,
+            labelStyle: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            tabs: [
+              Tab(
+                icon: Icon(Icons.trending_up, size: 20),
+                text: 'Market Trends',
+              ),
+              Tab(
+                icon: Icon(Icons.dashboard, size: 20),
+                text: 'Market Overview',
+              ),
+            ],
           ),
         ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: darkGreen),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: darkGreen),
-            onPressed: fetchMarketUpdates,
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: fetchMarketUpdates,
-        color: primaryGreen,
-        child: isLoading
-            ? const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-          ),
-        )
-            : errorMessage.isNotEmpty
-            ? _buildErrorState()
-            : SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
+        body: RefreshIndicator(
+          onRefresh: refreshAll,
+          color: primaryGreen,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Market Intelligence Card
               _buildMarketInsightCard(),
 
-              // Stats Row
-              _buildAnimatedContainer(
-                delay: 1,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      _buildStatsCard(
-                        "Products",
-                        "${topProducts.length}",
-                        Icons.inventory,
-                        primaryGreen,
-                      ),
-                      const SizedBox(width: 12),
-                      _buildStatsCard(
-                        "Sellers",
-                        "${topSellers.length}",
-                        Icons.people,
-                        lightGreen,
-                      ),
-                    ],
-                  ),
+              // Tab Content
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildTrendsTab(),
+                    _buildOverviewTab(),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 32),
-
-              // Top Products Section
-              _buildTopProducts(),
-
-              const SizedBox(height: 32),
-
-              // Top Sellers Section
-              _buildTopSellers(),
-
-              const SizedBox(height: 32),
             ],
           ),
         ),

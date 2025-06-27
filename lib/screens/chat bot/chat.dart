@@ -4,14 +4,17 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ChatBotScreen extends StatefulWidget {
+  final Map<String, dynamic> userData;
+  final String token;
+
   const ChatBotScreen({
-    Key? key,
-    required Map<String, dynamic> userData,
-    required String token
-  }) : super(key: key);
+    super.key,
+    required this.userData,
+    required this.token,
+  });
 
   @override
-  _ChatBotScreenState createState() => _ChatBotScreenState();
+  State<ChatBotScreen> createState() => _ChatBotScreenState();
 }
 
 class _ChatBotScreenState extends State<ChatBotScreen>
@@ -22,6 +25,7 @@ class _ChatBotScreenState extends State<ChatBotScreen>
   bool isLoading = false;
   late AnimationController _animationController;
 
+  /// Update this for your server environment
   final String apiUrl = "http://10.0.2.2:3000/api/chatbot";
 
   // AgriTech color scheme
@@ -39,10 +43,10 @@ class _ChatBotScreenState extends State<ChatBotScreen>
       vsync: this,
     );
 
-    // Add welcome message
     _messages.add({
       "isUser": false,
-      "text": "🌱 Welcome to AgriTech AI! I'm here to help you with farming insights, crop advice, and agricultural solutions. How can I assist you today?",
+      "text":
+      "🌱 Welcome to AgriTech AI! I'm here to help you with farming insights, crop advice, and agricultural solutions. How can I assist you today?",
       "timestamp": DateTime.now(),
     });
   }
@@ -51,6 +55,7 @@ class _ChatBotScreenState extends State<ChatBotScreen>
   void dispose() {
     _animationController.dispose();
     _scrollController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -74,6 +79,7 @@ class _ChatBotScreenState extends State<ChatBotScreen>
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
+          "Authorization": "Bearer ${widget.token}",
         },
         body: jsonEncode({"message": message}),
       );
@@ -83,7 +89,8 @@ class _ChatBotScreenState extends State<ChatBotScreen>
         setState(() {
           _messages.add({
             "isUser": false,
-            "text": data["reply"] ?? "Sorry, I didn't understand that.",
+            "text": data["reply"] ??
+                "🤖 Sorry, I didn't quite understand that. Try rephrasing!",
             "timestamp": DateTime.now(),
           });
         });
@@ -91,7 +98,8 @@ class _ChatBotScreenState extends State<ChatBotScreen>
         setState(() {
           _messages.add({
             "isUser": false,
-            "text": "🔧 I'm having trouble connecting right now. Please try again in a moment.",
+            "text":
+            "⚠️ Server issue. Please try again later. (${response.statusCode})",
             "timestamp": DateTime.now(),
           });
         });
@@ -100,7 +108,8 @@ class _ChatBotScreenState extends State<ChatBotScreen>
       setState(() {
         _messages.add({
           "isUser": false,
-          "text": "🌐 Connection issue detected. Please check your internet and try again.",
+          "text":
+          "🌐 Connection error. Please check your internet connection and try again.",
           "timestamp": DateTime.now(),
         });
       });
@@ -150,9 +159,8 @@ class _ChatBotScreenState extends State<ChatBotScreen>
                 bottom: 8,
               ),
               child: Column(
-                crossAxisAlignment: isUser
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
+                crossAxisAlignment:
+                isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -235,7 +243,7 @@ class _ChatBotScreenState extends State<ChatBotScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            "AI is thinking",
+            "AI is thinking...",
             style: GoogleFonts.poppins(
               fontSize: 15,
               color: Colors.grey[600],
@@ -326,101 +334,105 @@ class _ChatBotScreenState extends State<ChatBotScreen>
               },
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
+          buildInputField(),
+        ],
+      ),
+    );
+  }
+
+  Widget buildInputField() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: Colors.grey[200]!,
+                    width: 1,
+                  ),
                 ),
-              ],
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: backgroundColor,
-                        borderRadius: BorderRadius.circular(25),
-                        border: Border.all(
-                          color: Colors.grey[200]!,
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          color: Colors.grey[800],
-                        ),
-                        decoration: InputDecoration(
-                          hintText: "Ask about crops, weather, pests...",
-                          hintStyle: GoogleFonts.poppins(
-                            fontSize: 15,
-                            color: Colors.grey[500],
-                            fontWeight: FontWeight.w400,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 14,
-                          ),
-                        ),
-                        maxLines: null,
-                        textCapitalization: TextCapitalization.sentences,
-                        onSubmitted: (value) {
-                          sendMessage(value.trim());
-                          _controller.clear();
-                        },
-                      ),
+                child: TextField(
+                  controller: _controller,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: Colors.grey[800],
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "Ask about crops, weather, pests...",
+                    hintStyle: GoogleFonts.poppins(
+                      fontSize: 15,
+                      color: Colors.grey[500],
+                      fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryGreen, lightGreen],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryGreen.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(25),
-                        onTap: isLoading
-                            ? null
-                            : () {
-                          sendMessage(_controller.text.trim());
-                          _controller.clear();
-                        },
-                        child: Icon(
-                          isLoading ? Icons.hourglass_empty : Icons.send_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  onSubmitted: (value) {
+                    sendMessage(value.trim());
+                    _controller.clear();
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryGreen, lightGreen],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryGreen.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(25),
+                  onTap: isLoading
+                      ? null
+                      : () {
+                    sendMessage(_controller.text.trim());
+                    _controller.clear();
+                  },
+                  child: Icon(
+                    isLoading ? Icons.hourglass_empty : Icons.send_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

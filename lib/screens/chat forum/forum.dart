@@ -10,307 +10,409 @@ class ForumScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
   final String token;
 
-  const ForumScreen({Key? key, required this.userData, required this.token}) : super(key: key);
+  const ForumScreen({
+    super.key,
+    required this.userData,
+    required this.token,
+  });
 
   @override
   State<ForumScreen> createState() => _ForumScreenState();
 }
 
-class _ForumScreenState extends State<ForumScreen> {
-  final TextEditingController _messageController = TextEditingController();
-  final ImagePicker _imagePicker = ImagePicker();
+class _ForumScreenState extends State<ForumScreen> with SingleTickerProviderStateMixin {
+  List<dynamic> posts = [];
+  bool isLoading = true;
+  late AnimationController _animationController;
+
+  final ImagePicker _picker = ImagePicker();
   File? _selectedImage;
-  bool _isSending = false;
-  bool _isLoading = true;
-  List<dynamic> messages = [];
-  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _postController = TextEditingController();
 
   final String baseUrl = 'http://10.0.2.2:3000';
+
+  // AgriTech Color Palette
+  static const Color primaryGreen = Color(0xFF2E7D32);
+  static const Color lightGreen = Color(0xFF4CAF50);
+  static const Color accentGreen = Color(0xFF66BB6A);
+  static const Color backgroundGreen = Color(0xFFF1F8E9);
+  static const Color cardGreen = Color(0xFFE8F5E8);
 
   @override
   void initState() {
     super.initState();
-
-    print("👤 ForumScreen loaded with userData:");
-    widget.userData.forEach((key, value) {
-      print("➡️ $key: $value");
-    });
-    print("📌 Extracted user ID: ${widget.userData['id']}");
-
-    fetchMessages();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    fetchPosts();
   }
-
 
   @override
   void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
+    _animationController.dispose();
+    _postController.dispose();
     super.dispose();
-
   }
 
-  Future<void> fetchMessages() async {
-    try {
-      setState(() => _isLoading = true);
+  // Helper method to construct proper image URLs
+  String getImageUrl(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) return '';
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/forum/messages'),
-        headers: {'Authorization': 'Bearer ${widget.token}'},
-      );
+    // Clean the input path
+    String cleanPath = imagePath.trim();
 
-      final data = jsonDecode(response.body);
+    // Debug logging
+    print('🔍 Original image path: "$imagePath"');
 
-      if (data['success']) {
-        setState(() => messages = data['data']);
+    // If the path already contains the full URL, return as is but validate it
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+      // Check for doubled base URLs and fix them
+      if (cleanPath.contains('$baseUrl$baseUrl')) {
+        cleanPath = cleanPath.replaceFirst('$baseUrl$baseUrl', baseUrl);
+        print('🔧 Fixed doubled base URL: "$cleanPath"');
+      }
 
-        // Scroll to bottom after messages load
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
-          }
+      // Check for malformed URLs like "http://10.0.2.2:3000uploads/"
+      if (cleanPath.contains('${baseUrl}uploads/') && !cleanPath.contains('$baseUrl/uploads/')) {
+        cleanPath = cleanPath.replaceFirst('${baseUrl}uploads/', '$baseUrl/uploads/');
+        print('🔧 Fixed missing slash in uploads: "$cleanPath"');
+      }
+
+      // Fix port issues like "http://10.0.2.2:30001750101703312"
+      RegExp portIssueRegex = RegExp(r'http://[\d\.]+:3000(\d+.*)');
+      if (portIssueRegex.hasMatch(cleanPath)) {
+        cleanPath = cleanPath.replaceAllMapped(portIssueRegex, (match) {
+          String filename = match.group(1) ?? '';
+          String result = '$baseUrl/uploads/$filename';
+          print('🔧 Fixed port issue: "${match.group(0)}" -> "$result"');
+          return result;
         });
+      }
+
+      print('✅ Final URL: "$cleanPath"');
+      return cleanPath;
+    }
+
+    // Remove leading slash if present to avoid double slashes
+    if (cleanPath.startsWith('/')) {
+      cleanPath = cleanPath.substring(1);
+    }
+
+    // Construct the full URL
+    String finalUrl = '$baseUrl/$cleanPath';
+    print('✅ Constructed URL: "$finalUrl"');
+    return finalUrl;
+  }
+
+  Future<void> fetchPosts() async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/posts'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+      final data = jsonDecode(res.body);
+      if (data['success']) {
+        setState(() {
+          posts = data['data'];
+        });
+        _animationController.forward();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load messages')),
-        );
+        showError('Failed to load community posts');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString().substring(0, 50)}...')),
-      );
+      showError('Connection error: ${e.toString()}');
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => isLoading = false);
     }
   }
 
-  Future<void> sendMessage() async {
-    final text = _messageController.text.trim();
+  void showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: primaryGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Future<void> createPost() async {
+    final text = _postController.text.trim();
     if (text.isEmpty && _selectedImage == null) return;
 
-    // 🛡️ Check if user ID is valid
-    final userId = widget.userData['id'];
-    if (userId == null || userId.toString() == 'null') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Cannot send message: user ID is missing')),
-      );
-      return;
-    }
-
-    print("🧪 Sending message with user_id: $userId");
-
-    setState(() => _isSending = true);
-
     try {
-      final uri = Uri.parse('$baseUrl/api/forum/messages');
-      final request = http.MultipartRequest('POST', uri);
+      final uri = Uri.parse('$baseUrl/api/posts');
+      final req = http.MultipartRequest('POST', uri);
+      req.headers['Authorization'] = 'Bearer ${widget.token}';
 
-      // Add headers including auth token
-      request.headers['Authorization'] = 'Bearer ${widget.token}';
-
-      print("📤 Sending: user_id=${request.fields['user_id']}, text=${request.fields['text']}");
-
-      // ✅ Properly formatted fields
-      request.fields['user_id'] = userId.toString();
-      request.fields['text'] = text;
+      req.fields['user_id'] = widget.userData['id'].toString();
+      req.fields['text'] = text;
 
       if (_selectedImage != null) {
-        request.files.add(await http.MultipartFile.fromPath('image', _selectedImage!.path));
+        req.files.add(await http.MultipartFile.fromPath(
+          'image',
+          _selectedImage!.path,
+        ));
       }
 
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode == 201) {
-        _messageController.clear();
+      final res = await req.send();
+      if (res.statusCode == 201) {
+        _postController.clear();
         setState(() => _selectedImage = null);
-        fetchMessages();
+        showSuccess('Post shared with the community! 🌱');
+        fetchPosts();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Failed to send message: ${response.body}')),
-        );
+        final body = await res.stream.bytesToString();
+        showError('Failed to share post: $body');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('💥 Error sending: ${e.toString().substring(0, 50)}...')),
-      );
-    } finally {
-      setState(() => _isSending = false);
+      showError(e.toString());
     }
   }
 
+  Future<void> createComment(int postId, String text) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/comments'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'user_id': widget.userData['id'],
+          'post_id': postId,
+          'text': text,
+        }),
+      );
+      if (res.statusCode == 201) {
+        showSuccess('Comment added! 💬');
+        fetchPosts();
+      } else {
+        showError('Failed to add comment');
+      }
+    } catch (e) {
+      showError(e.toString());
+    }
+  }
+
+  Future<void> likePost(int postId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/posts/$postId/like'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'user_id': widget.userData['id']}),
+      );
+      if (res.statusCode == 200) {
+        fetchPosts();
+      } else {
+        showError('Failed to like post');
+      }
+    } catch (e) {
+      showError(e.toString());
+    }
+  }
+
+  Future<void> likeComment(int commentId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/api/comments/$commentId/like'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'user_id': widget.userData['id']}),
+      );
+      if (res.statusCode == 200) {
+        fetchPosts();
+      } else {
+        showError('Failed to like comment');
+      }
+    } catch (e) {
+      showError(e.toString());
+    }
+  }
 
   Future<void> pickImage() async {
-    try {
-      final image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1200,
-      );
-
-      if (image != null) {
-        setState(() => _selectedImage = File(image.path));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: ${e.toString()}')),
-      );
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      setState(() => _selectedImage = File(picked.path));
     }
   }
 
-  Future<void> takePhoto() async {
-    try {
-      final image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80,
-        maxWidth: 1200,
-      );
+  String formatTime(String timestamp) {
+    final date = DateTime.parse(timestamp);
+    final now = DateTime.now();
+    final difference = now.difference(date);
 
-      if (image != null) {
-        setState(() => _selectedImage = File(image.path));
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error taking photo: ${e.toString()}')),
-      );
-    }
-  }
-
-  String _getTimeDisplay(String timestamp) {
-    final DateTime now = DateTime.now();
-    final DateTime messageTime = DateTime.parse(timestamp);
-    final Duration difference = now.difference(messageTime);
-
-    if (difference.inDays == 0) {
-      return DateFormat('h:mm a').format(messageTime);
-    } else if (difference.inDays == 1) {
-      return 'Yesterday at ${DateFormat('h:mm a').format(messageTime)}';
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
-      return DateFormat('EEEE').format(messageTime);
+      return '${difference.inDays}d ago';
     } else {
-      return DateFormat('MMM d, y').format(messageTime);
+      return DateFormat('MMM d').format(date);
     }
   }
 
-  Widget buildMessageCard(dynamic msg, bool isFirstInGroup, bool isLastInGroup) {
-    final user = msg['User'];
-    final bool isCurrentUser = user['id'] == widget.userData['id'];
-    final String? imgUrl = msg['image_url'];
-    final String timeDisplay = _getTimeDisplay(msg['createdAt']);
+  Widget buildCreatePostCard() {
+    final userProfileImageUrl = getImageUrl(widget.userData['profile_image']);
 
-    return Padding(
-      padding: EdgeInsets.only(
-        top: isFirstInGroup ? 12.0 : 2.0,
-        bottom: isLastInGroup ? 12.0 : 2.0,
-        left: 16.0,
-        right: 16.0,
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryGreen.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          if (!isCurrentUser && isFirstInGroup) ...[
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.grey.shade300,
-              backgroundImage: user['profile_image'] != null
-                  ? NetworkImage('$baseUrl${user['profile_image']}')
-                  : null,
-              child: user['profile_image'] == null
-                  ? Icon(Icons.person, size: 20, color: Colors.grey.shade700)
-                  : null,
-            ),
-            SizedBox(width: 8),
-          ],
-          if (!isCurrentUser && !isFirstInGroup)
-            SizedBox(width: 44), // Space for alignment with avatar
-
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (isFirstInGroup && !isCurrentUser)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
-                    child: Text(
-                      user['full_name'],
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
+          if (_selectedImage != null)
+            Container(
+              margin: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    Image.file(
+                      _selectedImage!,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedImage = null),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, color: Colors.white, size: 18),
+                        ),
                       ),
                     ),
-                  ),
-
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.75,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isCurrentUser
-                        ? Theme.of(context).colorScheme.primary.withOpacity(0.9)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 3,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (msg['text'] != null && msg['text'].toString().trim().isNotEmpty)
-                          Padding(
-                            padding: EdgeInsets.all(12.0),
-                            child: Text(
-                              msg['text'],
-                              style: TextStyle(
-                                color: isCurrentUser ? Colors.white : Colors.black87,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                        if (imgUrl != null)
-                          CachedNetworkImage(
-                            imageUrl: '$baseUrl$imgUrl',
-                            placeholder: (_, __) => Container(
-                              height: 200,
-                              color: Colors.grey.shade300,
-                              child: Center(child: CircularProgressIndicator()),
-                            ),
-                            errorWidget: (_, __, ___) => Container(
-                              height: 200,
-                              color: Colors.grey.shade300,
-                              child: Icon(Icons.error, color: Colors.red),
-                            ),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
-
-                if (isLastInGroup)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0, left: 4.0, right: 4.0),
-                    child: Text(
-                      timeDisplay,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade600,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: cardGreen,
+                      child: userProfileImageUrl.isNotEmpty
+                          ? ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: userProfileImageUrl,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Icon(Icons.agriculture, color: primaryGreen, size: 20),
+                          errorWidget: (_, __, ___) => Icon(Icons.agriculture, color: primaryGreen, size: 20),
+                        ),
+                      )
+                          : Icon(Icons.agriculture, color: primaryGreen, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: backgroundGreen,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: TextField(
+                          controller: _postController,
+                          maxLines: null,
+                          decoration: InputDecoration(
+                            hintText: "Share your farming insights...",
+                            hintStyle: TextStyle(color: Colors.grey.shade600),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.photo_camera,
+                      label: "Photo",
+                      color: accentGreen,
+                      onTap: pickImage,
+                    ),
+
+                    _buildActionButton(
+                      icon: Icons.send,
+                      label: "Share",
+                      color: primaryGreen,
+                      onTap: createPost,
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -319,271 +421,529 @@ class _ForumScreenState extends State<ForumScreen> {
     );
   }
 
-  List<Widget> buildMessageBubbles() {
-    List<Widget> bubbles = [];
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    for (int i = 0; i < messages.length; i++) {
-      final msg = messages[i];
-      final user = msg['User'];
-      final bool isCurrentUser = user['id'] == widget.userData['id'];
+  Widget buildPostCard(dynamic post) {
+    final user = post['User'];
+    final comments = post['Comments'] ?? [];
+    final commentController = TextEditingController();
 
-      // Determine if this message is part of a group
-      bool isFirstInGroup = true;
-      bool isLastInGroup = true;
+    final userProfileImageUrl = getImageUrl(user['profile_image']);
+    final postImageUrl = getImageUrl(post['image_url']);
 
-      if (i > 0) {
-        // Check if previous message is from the same user
-        final prevMsg = messages[i - 1];
-        final prevUser = prevMsg['User'];
-        if (prevUser['id'] == user['id']) {
-          isFirstInGroup = false;
-        }
-      }
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: primaryGreen.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: cardGreen,
+                  child: userProfileImageUrl.isNotEmpty
+                      ? ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: userProfileImageUrl,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Icon(Icons.agriculture, color: primaryGreen),
+                      errorWidget: (_, __, ___) => Icon(Icons.agriculture, color: primaryGreen),
+                    ),
+                  )
+                      : Icon(Icons.agriculture, color: primaryGreen),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user['full_name'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        formatTime(post['createdAt']),
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: backgroundGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.eco,
+                    color: primaryGreen,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-      if (i < messages.length - 1) {
-        // Check if next message is from the same user
-        final nextMsg = messages[i + 1];
-        final nextUser = nextMsg['User'];
-        if (nextUser['id'] == user['id']) {
-          isLastInGroup = false;
-        }
-      }
+          // Content
+          if (post['text'] != null && post['text'].toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                post['text'],
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              ),
+            ),
 
-      bubbles.add(buildMessageCard(msg, isFirstInGroup, isLastInGroup));
-    }
+          if (post['text'] != null && post['text'].toString().isNotEmpty)
+            const SizedBox(height: 12),
 
-    return bubbles;
+          // Image
+          if (postImageUrl.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: postImageUrl,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    height: 200,
+                    color: backgroundGreen,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    height: 200,
+                    color: Colors.grey.shade200,
+                    child: Icon(Icons.broken_image, color: Colors.grey.shade400),
+                  ),
+                ),
+              ),
+            ),
+
+          // Actions
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                _buildInteractionButton(
+                  icon: Icons.favorite,
+                  count: post['likes_count'],
+                  color: Colors.red.shade400,
+                  onTap: () => likePost(post['id']),
+                ),
+                const SizedBox(width: 20),
+                _buildInteractionButton(
+                  icon: Icons.chat_bubble_outline,
+                  count: comments.length,
+                  color: primaryGreen,
+                  onTap: () {},
+                ),
+                const Spacer(),
+                Icon(Icons.share_outlined, color: Colors.grey.shade500),
+              ],
+            ),
+          ),
+
+          // Comments Section
+          if (comments.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              height: 1,
+              color: Colors.grey.shade200,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Comments",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: primaryGreen,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...comments.take(3).map<Widget>((c) {
+                    final commentUser = c['User'];
+                    final commentUserProfileImageUrl = getImageUrl(commentUser['profile_image']);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: backgroundGreen,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: cardGreen,
+                            child: commentUserProfileImageUrl.isNotEmpty
+                                ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: commentUserProfileImageUrl,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Icon(Icons.person, size: 16, color: primaryGreen),
+                                errorWidget: (_, __, ___) => Icon(Icons.person, size: 16, color: primaryGreen),
+                              ),
+                            )
+                                : Icon(Icons.person, size: 16, color: primaryGreen),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  commentUser['full_name'],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  c['text'],
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            children: [
+                              Text(
+                                '${c['likes_count']}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              InkWell(
+                                onTap: () => likeComment(c['id']),
+                                child: Icon(
+                                  Icons.thumb_up,
+                                  size: 16,
+                                  color: accentGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  if (comments.length > 3)
+                    TextButton(
+                      onPressed: () {}, // TODO: Show all comments
+                      child: Text(
+                        "View ${comments.length - 3} more comments",
+                        style: TextStyle(color: primaryGreen),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+
+          // Add Comment
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: Colors.grey.shade200,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: cardGreen,
+                  child: getImageUrl(widget.userData['profile_image']).isNotEmpty
+                      ? ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: getImageUrl(widget.userData['profile_image']),
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Icon(Icons.agriculture, size: 16, color: primaryGreen),
+                      errorWidget: (_, __, ___) => Icon(Icons.agriculture, size: 16, color: primaryGreen),
+                    ),
+                  )
+                      : Icon(Icons.agriculture, size: 16, color: primaryGreen),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: backgroundGreen,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextField(
+                      controller: commentController,
+                      decoration: InputDecoration(
+                        hintText: "Add a comment...",
+                        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: primaryGreen,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                    onPressed: () {
+                      if (commentController.text.trim().isNotEmpty) {
+                        createComment(post['id'], commentController.text.trim());
+                        commentController.clear();
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInteractionButton({
+    required IconData icon,
+    required int count,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
-
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: backgroundGreen,
       appBar: AppBar(
-        title: Text(
-          'Community ',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
         elevation: 0,
-        backgroundColor: colorScheme.background,
+        backgroundColor: Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryGreen,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.agriculture, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "AgriCommunity",
+              style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: colorScheme.primary),
-            onPressed: fetchMessages,
-            tooltip: 'Refresh messages',
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: cardGreen,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(Icons.refresh, color: primaryGreen),
+              onPressed: fetchPosts,
+            ),
           ),
         ],
       ),
-      body: SafeArea(
+      body: isLoading
+          ? Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: _isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : messages.isEmpty
-                  ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.forum_outlined, size: 64, color: Colors.grey.shade400),
-                    SizedBox(height: 16),
-                    Text(
-                      'No messages yet',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey.shade600,
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Loading community posts...",
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      )
+          : RefreshIndicator(
+        onRefresh: fetchPosts,
+        color: primaryGreen,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: buildCreatePostCard(),
+            ),
+            if (posts.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.agriculture,
+                        size: 64,
+                        color: Colors.grey.shade400,
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Be the first to start a conversation!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
+                      const SizedBox(height: 16),
+                      Text(
+                        "No posts yet",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        "Be the first to share your farming insights!",
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ),
                 ),
               )
-                  : ListView(
-                controller: _scrollController,
-                padding: EdgeInsets.symmetric(vertical: 8),
-                children: buildMessageBubbles(),
-              ),
-            ),
-
-            // Image preview
-            if (_selectedImage != null)
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(8.0),
-                color: Colors.grey.shade100,
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImage!,
-                        height: 120,
-                        width: 120,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedImage = null),
-                        child: Container(
-                          padding: EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            shape: BoxShape.circle,
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    return FadeTransition(
+                      opacity: _animationController,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _animationController,
+                          curve: Interval(
+                            (index / posts.length) * 0.5,
+                            ((index + 1) / posts.length) * 0.5 + 0.5,
+                            curve: Curves.easeOut,
                           ),
-                          child: Icon(
-                            Icons.close,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                        ),
+                        )),
+                        child: buildPostCard(posts[index]),
                       ),
-                    ),
-                  ],
+                    );
+                  },
+                  childCount: posts.length,
                 ),
               ),
-
-            // Message input area
-            Container(
-              padding: EdgeInsets.all(12.0),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    spreadRadius: 1,
-                    offset: Offset(0, -1),
-                  ),
-                ],
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Attachment button
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: PopupMenuButton<String>(
-                      icon: Icon(Icons.add, color: Colors.grey.shade700),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'gallery',
-                          child: Row(
-                            children: [
-                              Icon(Icons.photo_library, color: colorScheme.primary),
-                              SizedBox(width: 8),
-                              Text('Gallery'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'camera',
-                          child: Row(
-                            children: [
-                              Icon(Icons.camera_alt, color: colorScheme.primary),
-                              SizedBox(width: 8),
-                              Text('Camera'),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onSelected: (value) {
-                        if (value == 'gallery') {
-                          pickImage();
-                        } else if (value == 'camera') {
-                          takePhoto();
-                        }
-                      },
-                    ),
-                  ),
-
-                  SizedBox(width: 8),
-
-                  // Message text field
-                  Expanded(
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxHeight: 120, // Limit max height for multi-line messages
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _messageController,
-                        maxLines: null,
-                        textCapitalization: TextCapitalization.sentences,
-                        style: TextStyle(fontSize: 15),
-                        decoration: InputDecoration(
-                          hintText: 'Write a message...',
-                          hintStyle: TextStyle(color: Colors.grey.shade500),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(width: 8),
-
-                  // Send button
-                  GestureDetector(
-                    onTap: _isSending ? null : sendMessage,
-                    child: Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.3),
-                            spreadRadius: 1,
-                            blurRadius: 3,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: _isSending
-                          ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                          : Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 80),
             ),
           ],
         ),

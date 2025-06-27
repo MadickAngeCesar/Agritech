@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../chat forum/forum.dart';
 import '../market 2/market.dart';
-import '../market updates/marketupdates.dart';
 import '../navigation bar/navigation_bar.dart';
 import '../notifications/notifications.dart';
 
