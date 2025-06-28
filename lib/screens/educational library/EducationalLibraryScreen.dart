@@ -52,23 +52,28 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   bool _isLoading = false;
   bool _isCategoriesLoading = false;
   String? _errorMessage;
-  MenuItem _selectedMenuItem =  MenuItem.dashboard;
-  bool _isSidebarCollapsed = true; // Always start collapsed
+  MenuItem _selectedMenuItem = MenuItem.dashboard;
+  bool _isSidebarCollapsed = true;
   bool _showCategoriesInSidebar = false;
 
-  // Responsive breakpoints
+  // Enhanced responsive breakpoints with more granular control
+  static const double extraSmallBreakpoint = 360;
+  static const double smallMobileBreakpoint = 480;
   static const double mobileBreakpoint = 600;
-  static const double tabletBreakpoint = 900;
+  static const double tabletBreakpoint = 768;
+  static const double largeTabletBreakpoint = 1024;
   static const double desktopBreakpoint = 1200;
+  static const double largeDesktopBreakpoint = 1440;
+  static const double extraLargeDesktopBreakpoint = 1920;
 
   @override
   void initState() {
     super.initState();
     _apiService = ApiService(token: widget.token);
 
-    // Initialize animations
+    // Initialize animations with device-specific durations
     _sidebarAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: Duration(milliseconds: _getAnimationDuration()),
       vsync: this,
     );
 
@@ -97,24 +102,158 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
     super.dispose();
   }
 
-  // Get responsive dimensions
+  // Enhanced device type detection
+  bool get isExtraSmall => MediaQuery.of(context).size.width < extraSmallBreakpoint;
+  bool get isSmallMobile => MediaQuery.of(context).size.width >= extraSmallBreakpoint &&
+      MediaQuery.of(context).size.width < smallMobileBreakpoint;
   bool get isMobile => MediaQuery.of(context).size.width < mobileBreakpoint;
   bool get isTablet => MediaQuery.of(context).size.width >= mobileBreakpoint &&
-      MediaQuery.of(context).size.width < tabletBreakpoint;
-  bool get isDesktop => MediaQuery.of(context).size.width >= desktopBreakpoint;
+      MediaQuery.of(context).size.width < largeTabletBreakpoint;
+  bool get isLargeTablet => MediaQuery.of(context).size.width >= tabletBreakpoint &&
+      MediaQuery.of(context).size.width < largeTabletBreakpoint;
+  bool get isDesktop => MediaQuery.of(context).size.width >= largeTabletBreakpoint &&
+      MediaQuery.of(context).size.width < largeDesktopBreakpoint;
+  bool get isLargeDesktop => MediaQuery.of(context).size.width >= largeDesktopBreakpoint;
+  bool get isExtraLargeDesktop => MediaQuery.of(context).size.width >= extraLargeDesktopBreakpoint;
 
+  // Enhanced responsive getters
   double get screenWidth => MediaQuery.of(context).size.width;
   double get screenHeight => MediaQuery.of(context).size.height;
 
+  // Device pixel ratio for high DPI displays
+  double get devicePixelRatio => MediaQuery.of(context).devicePixelRatio;
+
+  // Text scale factor for accessibility
+  double get textScaleFactor => MediaQuery.of(context).textScaleFactor;
+
+  // Responsive sidebar dimensions
   double get sidebarExpandedWidth {
+    if (isExtraSmall) return screenWidth * 0.85;
+    if (isSmallMobile) return screenWidth * 0.82;
     if (isMobile) return screenWidth * 0.8;
     if (isTablet) return 280;
-    return 320;
+    if (isLargeTablet) return 300;
+    if (isDesktop) return 320;
+    if (isLargeDesktop) return 340;
+    return 360; // Extra large desktop
   }
 
   double get sidebarCollapsedWidth {
     if (isMobile) return 0;
-    return 72;
+    if (isTablet) return 64;
+    if (isLargeTablet) return 68;
+    return 72; // Desktop and larger
+  }
+
+  // Responsive padding and margins
+  EdgeInsets get mainPadding {
+    if (isExtraSmall) return const EdgeInsets.all(12);
+    if (isSmallMobile) return const EdgeInsets.all(14);
+    if (isMobile) return const EdgeInsets.all(16);
+    if (isTablet) return const EdgeInsets.all(20);
+    if (isLargeTablet) return const EdgeInsets.all(24);
+    if (isDesktop) return const EdgeInsets.all(28);
+    return const EdgeInsets.all(32); // Large desktop
+  }
+
+  EdgeInsets get sidebarPadding {
+    if (isExtraSmall) return const EdgeInsets.all(12);
+    if (isSmallMobile) return const EdgeInsets.all(14);
+    if (isMobile) return const EdgeInsets.all(16);
+    if (isTablet) return const EdgeInsets.all(18);
+    return const EdgeInsets.all(20); // Desktop and larger
+  }
+
+  // Animation duration based on device performance
+  int _getAnimationDuration() {
+    if (isExtraSmall || devicePixelRatio > 2.5) return 400; // Slower for low-end devices
+    if (isMobile) return 350;
+    if (isTablet) return 300;
+    return 250; // Faster for desktop
+  }
+
+  // Responsive font sizes
+  double get headerFontSize {
+    if (isExtraSmall) return 18;
+    if (isSmallMobile) return 20;
+    if (isMobile) return 22;
+    if (isTablet) return 24;
+    if (isLargeTablet) return 26;
+    if (isDesktop) return 28;
+    return 30; // Large desktop
+  }
+
+  double get titleFontSize {
+    if (isExtraSmall) return 14;
+    if (isSmallMobile) return 16;
+    if (isMobile) return 18;
+    if (isTablet) return 20;
+    if (isLargeTablet) return 22;
+    return 24; // Desktop and larger
+  }
+
+  double get bodyFontSize {
+    if (isExtraSmall) return 12;
+    if (isSmallMobile) return 13;
+    if (isMobile) return 14;
+    if (isTablet) return 15;
+    return 16; // Desktop and larger
+  }
+
+  double get captionFontSize {
+    if (isExtraSmall) return 10;
+    if (isSmallMobile) return 11;
+    if (isMobile) return 12;
+    return 13; // Tablet and larger
+  }
+
+  // Responsive icon sizes
+  double get primaryIconSize {
+    if (isExtraSmall) return 18;
+    if (isSmallMobile) return 20;
+    if (isMobile) return 22;
+    if (isTablet) return 24;
+    return 26; // Desktop and larger
+  }
+
+  double get secondaryIconSize {
+    if (isExtraSmall) return 14;
+    if (isSmallMobile) return 16;
+    if (isMobile) return 18;
+    return 20; // Tablet and larger
+  }
+
+  // Responsive spacing
+  double get primarySpacing {
+    if (isExtraSmall) return 8;
+    if (isSmallMobile) return 10;
+    if (isMobile) return 12;
+    if (isTablet) return 16;
+    return 20; // Desktop and larger
+  }
+
+  double get secondarySpacing {
+    if (isExtraSmall) return 4;
+    if (isSmallMobile) return 6;
+    if (isMobile) return 8;
+    return 12; // Tablet and larger
+  }
+
+  // Responsive button dimensions
+  double get buttonHeight {
+    if (isExtraSmall) return 36;
+    if (isSmallMobile) return 40;
+    if (isMobile) return 44;
+    if (isTablet) return 48;
+    return 52; // Desktop and larger
+  }
+
+  double get buttonMinWidth {
+    if (isExtraSmall) return 80;
+    if (isSmallMobile) return 90;
+    if (isMobile) return 100;
+    if (isTablet) return 120;
+    return 140; // Desktop and larger
   }
 
   Future<void> _initializeData() async {
@@ -318,14 +457,21 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppColorss.primary),
+            SizedBox(
+              width: primaryIconSize,
+              height: primaryIconSize,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColorss.primary),
+                strokeWidth: 2,
+              ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: primarySpacing),
             Expanded(
               child: Text(
                 message,
-                style: GoogleFonts.poppins(fontSize: 16),
+                style: GoogleFonts.poppins(
+                  fontSize: bodyFontSize,
+                ),
               ),
             ),
           ],
@@ -340,14 +486,19 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
+            Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: secondaryIconSize,
+            ),
+            SizedBox(width: secondarySpacing),
             Expanded(
               child: Text(
                 message,
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
+                  fontSize: bodyFontSize,
                 ),
               ),
             ),
@@ -358,7 +509,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        margin: EdgeInsets.all(isMobile ? 12 : 16),
+        margin: mainPadding,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -370,14 +521,19 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error, color: Colors.white, size: 20),
-            const SizedBox(width: 12),
+            Icon(
+              Icons.error,
+              color: Colors.white,
+              size: secondaryIconSize,
+            ),
+            SizedBox(width: secondarySpacing),
             Expanded(
               child: Text(
                 message,
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
+                  fontSize: bodyFontSize,
                 ),
               ),
             ),
@@ -388,7 +544,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        margin: EdgeInsets.all(isMobile ? 12 : 16),
+        margin: mainPadding,
         action: SnackBarAction(
           label: 'Retry',
           textColor: Colors.white,
@@ -403,13 +559,13 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
       case MenuItem.dashboard:
         return 'Dashboard Overview';
       case MenuItem.ebooks:
-        return 'Digital Library - Ebooks';
+        return isExtraSmall ? 'Ebooks' : 'Digital Library - Ebooks';
       case MenuItem.videos:
-        return 'Video Library';
+        return isExtraSmall ? 'Videos' : 'Video Library';
       case MenuItem.webinars:
-        return 'Live Webinars';
+        return isExtraSmall ? 'Webinars' : 'Live Webinars';
       case MenuItem.advisory:
-        return 'Expert Advisory';
+        return isExtraSmall ? 'Advisory' : 'Expert Advisory';
     }
   }
 
@@ -538,8 +694,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.15),
-                  blurRadius: 20,
-                  offset: const Offset(4, 0),
+                  blurRadius: isDesktop ? 20 : 15,
+                  offset: Offset(isDesktop ? 4 : 2, 0),
                 ),
               ],
             ),
@@ -555,35 +711,35 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   Widget _buildCollapsedSidebar() {
     return Column(
       children: [
-        const SizedBox(height: 20),
+        SizedBox(height: primarySpacing),
         // Logo/Icon
         Container(
-          width: 40,
-          height: 40,
+          width: primaryIconSize * 1.5,
+          height: primaryIconSize * 1.5,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.2),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.school_rounded,
             color: Colors.white,
-            size: 24,
+            size: primaryIconSize,
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: primarySpacing * 1.5),
 
         // Menu Items
         Expanded(
           child: Column(
             children: [
               _buildCollapsedMenuItem(Icons.dashboard_rounded, MenuItem.dashboard),
-              const SizedBox(height: 16),
+              SizedBox(height: primarySpacing),
               _buildCollapsedMenuItem(Icons.auto_stories, MenuItem.ebooks),
-              const SizedBox(height: 16),
+              SizedBox(height: primarySpacing),
               _buildCollapsedMenuItem(Icons.play_circle_filled, MenuItem.videos),
-              const SizedBox(height: 16),
+              SizedBox(height: primarySpacing),
               _buildCollapsedMenuItem(Icons.video_call, MenuItem.webinars),
-              const SizedBox(height: 16),
+              SizedBox(height: primarySpacing),
               _buildCollapsedMenuItem(Icons.support_agent, MenuItem.advisory),
             ],
           ),
@@ -591,21 +747,21 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
         // Expand Button
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: sidebarPadding,
           child: InkWell(
             onTap: _toggleSidebar,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              width: 40,
-              height: 40,
+              width: primaryIconSize * 1.5,
+              height: primaryIconSize * 1.5,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.chevron_right,
                 color: Colors.white,
-                size: 20,
+                size: secondaryIconSize,
               ),
             ),
           ),
@@ -616,7 +772,6 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   Widget _buildCollapsedMenuItem(IconData icon, MenuItem menuItem) {
     final isSelected = _selectedMenuItem == menuItem;
-    // Remove this line: _buildCollapsedMenuItem(Icons.dashboard_rounded, MenuItem.dashboard);
 
     return Tooltip(
       message: _getMenuItemTitle(menuItem),
@@ -625,8 +780,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         onTap: () => _onMenuItemTap(menuItem),
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 40,
-          height: 40,
+          width: primaryIconSize * 1.5,
+          height: primaryIconSize * 1.5,
           decoration: BoxDecoration(
             color: isSelected
                 ? Colors.white.withOpacity(0.3)
@@ -639,7 +794,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
           child: Icon(
             icon,
             color: Colors.white,
-            size: 20,
+            size: secondaryIconSize,
           ),
         ),
       ),
@@ -651,7 +806,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
       children: [
         // Header
         Container(
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          padding: sidebarPadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -659,16 +814,16 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: primaryIconSize * 1.5,
+                    height: primaryIconSize * 1.5,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.school_rounded,
                       color: Colors.white,
-                      size: 24,
+                      size: primaryIconSize,
                     ),
                   ),
                   const Spacer(),
@@ -676,7 +831,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     onTap: _toggleSidebar,
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: EdgeInsets.all(secondarySpacing / 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -684,17 +839,17 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       child: Icon(
                         isMobile ? Icons.close : Icons.chevron_left,
                         color: Colors.white,
-                        size: 18,
+                        size: secondaryIconSize,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: secondarySpacing),
               Text(
                 'AgriTech',
                 style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 20 : 22,
+                  fontSize: titleFontSize,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
@@ -704,7 +859,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               Text(
                 'Educational Library',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
+                  fontSize: captionFontSize,
                   fontWeight: FontWeight.w400,
                   color: Colors.white.withOpacity(0.8),
                 ),
@@ -719,7 +874,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         Expanded(
           child: SingleChildScrollView(
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 12),
+              padding: EdgeInsets.symmetric(horizontal: sidebarPadding.left),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -727,7 +882,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                   Text(
                     'LIBRARY',
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: captionFontSize - 1,
                       fontWeight: FontWeight.w600,
                       color: Colors.white.withOpacity(0.7),
                       letterSpacing: 1.0,
@@ -740,7 +895,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     'Overview & insights',
                   ),
 
-                  const SizedBox(height: 12),
+                  SizedBox(height: secondarySpacing),
 
                   _buildExpandedMenuItem(
                     Icons.auto_stories,
@@ -748,7 +903,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     MenuItem.ebooks,
                     'Discover digital books',
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: secondarySpacing / 2),
 
                   _buildExpandedMenuItem(
                     Icons.play_circle_filled,
@@ -756,7 +911,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     MenuItem.videos,
                     'Watch educational content',
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: secondarySpacing / 2),
 
                   _buildExpandedMenuItem(
                     Icons.video_call,
@@ -764,7 +919,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     MenuItem.webinars,
                     'Join live sessions',
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: secondarySpacing / 2),
 
                   _buildExpandedMenuItem(
                     Icons.support_agent,
@@ -778,7 +933,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       (_selectedMenuItem == MenuItem.ebooks || _selectedMenuItem == MenuItem.videos))
                     _buildCategoriesSection(),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: primarySpacing),
                 ],
               ),
             ),
@@ -787,8 +942,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
         // User Info
         Container(
-          margin: EdgeInsets.all(isMobile ? 16 : 12),
-          padding: const EdgeInsets.all(12),
+          margin: EdgeInsets.all(sidebarPadding.left),
+          padding: EdgeInsets.all(secondarySpacing),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
@@ -799,18 +954,18 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
           child: Row(
             children: [
               CircleAvatar(
-                radius: 16,
+                radius: primaryIconSize * 0.7,
                 backgroundColor: Colors.white.withOpacity(0.2),
                 child: Text(
                   (widget.userData['name'] ?? 'U')[0].toUpperCase(),
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
-                    fontSize: 12,
+                    fontSize: captionFontSize,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: secondarySpacing),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,7 +976,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                        fontSize: captionFontSize,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -830,7 +985,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       'Premium Member',
                       style: GoogleFonts.poppins(
                         color: Colors.white.withOpacity(0.8),
-                        fontSize: 10,
+                        fontSize: captionFontSize - 1,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -858,7 +1013,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(secondarySpacing),
         decoration: BoxDecoration(
           color: isSelected
               ? Colors.white.withOpacity(0.2)
@@ -871,8 +1026,8 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         child: Row(
           children: [
             Container(
-              width: 32,
-              height: 32,
+              width: primaryIconSize * 1.2,
+              height: primaryIconSize * 1.2,
               decoration: BoxDecoration(
                 color: isSelected
                     ? Colors.white.withOpacity(0.3)
@@ -882,10 +1037,10 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               child: Icon(
                 icon,
                 color: Colors.white,
-                size: 16,
+                size: secondaryIconSize,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: secondarySpacing),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,20 +1051,21 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: bodyFontSize,
                     ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 11,
+                  if (!isExtraSmall)
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: captionFontSize,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
                 ],
               ),
             ),
@@ -917,7 +1073,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.white,
-                size: 12,
+                size: captionFontSize,
               ),
           ],
         ),
@@ -927,7 +1083,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
 
   Widget _buildCategoriesSection() {
     return Container(
-      margin: const EdgeInsets.only(top: 16),
+      margin: EdgeInsets.only(top: primarySpacing),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -935,21 +1091,21 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
           Text(
             'CATEGORIES',
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: captionFontSize - 1,
               fontWeight: FontWeight.w600,
               color: Colors.white.withOpacity(0.7),
               letterSpacing: 1.0,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: secondarySpacing),
 
           if (_isCategoriesLoading)
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(secondarySpacing),
               child: Center(
                 child: SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: secondaryIconSize,
+                  height: secondaryIconSize,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -960,7 +1116,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
           else
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.3,
+                maxHeight: MediaQuery.of(context).size.height * (isExtraSmall ? 0.25 : 0.3),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -986,8 +1142,11 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
       borderRadius: BorderRadius.circular(6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.only(bottom: 2),
+        padding: EdgeInsets.symmetric(
+          horizontal: secondarySpacing,
+          vertical: secondarySpacing / 2,
+        ),
+        margin: EdgeInsets.only(bottom: secondarySpacing / 4),
         decoration: BoxDecoration(
           color: isSelected
               ? Colors.white.withOpacity(0.2)
@@ -1006,7 +1165,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: secondarySpacing),
             Expanded(
               child: Text(
                 name,
@@ -1015,7 +1174,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                       ? Colors.white
                       : Colors.white.withOpacity(0.8),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 12,
+                  fontSize: captionFontSize,
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
@@ -1042,12 +1201,11 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
     }
   }
 
-
   Widget _buildMainAppBar() {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 24,
-        vertical: 16,
+        horizontal: mainPadding.left,
+        vertical: primarySpacing,
       ),
       decoration: BoxDecoration(
         color: AppColorss.surface,
@@ -1067,7 +1225,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
               onTap: _toggleSidebar,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(secondarySpacing),
                 decoration: BoxDecoration(
                   color: AppColorss.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -1075,16 +1233,16 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                 child: Icon(
                   Icons.menu,
                   color: AppColorss.primary,
-                  size: 20,
+                  size: secondaryIconSize,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: secondarySpacing),
           ],
 
           // Title and Icon
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(secondarySpacing),
             decoration: BoxDecoration(
               color: AppColorss.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
@@ -1092,10 +1250,10 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
             child: Icon(
               _getSelectedMenuIcon(),
               color: AppColorss.primary,
-              size: isMobile ? 20 : 24,
+              size: primaryIconSize,
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: secondarySpacing),
 
           Expanded(
             child: Column(
@@ -1105,18 +1263,18 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                 Text(
                   _getSelectedMenuTitle(),
                   style: GoogleFonts.poppins(
-                    fontSize: isMobile ? 16 : 20,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.w700,
                     color: AppColorss.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                if (!isMobile)
+                if (!isMobile && !isExtraSmall)
                   Text(
                     'Explore our educational resources',
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: captionFontSize,
                       color: AppColorss.textSecondary,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -1139,16 +1297,16 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                   icon: Icon(
                     Icons.add,
                     color: AppColorss.primary,
-                    size: 20,
+                    size: secondaryIconSize,
                   ),
                   tooltip: 'Upload Content',
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                  constraints: BoxConstraints(
+                    minWidth: buttonHeight * 0.7,
+                    minHeight: buttonHeight * 0.7,
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: secondarySpacing / 2),
             ],
             Container(
               decoration: BoxDecoration(
@@ -1160,12 +1318,12 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
                 icon: Icon(
                   Icons.refresh,
                   color: AppColorss.primary,
-                  size: 20,
+                  size: secondaryIconSize,
                 ),
                 tooltip: 'Refresh',
-                constraints: const BoxConstraints(
-                  minWidth: 36,
-                  minHeight: 36,
+                constraints: BoxConstraints(
+                  minWidth: buttonHeight * 0.7,
+                  minHeight: buttonHeight * 0.7,
                 ),
               ),
             ),
@@ -1175,8 +1333,6 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
     );
   }
 
-  // Simply replace the _buildMainContent method in your existing file with this:
-
   Widget _buildMainContent() {
     if (_errorMessage != null) {
       return _buildErrorState();
@@ -1185,8 +1341,11 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
     switch (_selectedMenuItem) {
       case MenuItem.dashboard:
         return Container(
-          padding: EdgeInsets.all(isMobile ? 16 : 24),
-          child: MarketplaceDashboard(apiService: _apiService, isMobile: isMobile)
+          padding: mainPadding,
+          child: MarketplaceDashboard(
+            apiService: _apiService,
+            isMobile: isMobile,
+          ),
         );
       case MenuItem.ebooks:
         return _buildContentWithCategories(
@@ -1211,49 +1370,58 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
       case MenuItem.advisory:
         return Container(
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _selectedMenuItem == MenuItem.webinars
-                      ? Icons.video_call
-                      : Icons.support_agent,
-                  size: 64,
-                  color: AppColorss.primary.withOpacity(0.6),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _selectedMenuItem == MenuItem.webinars
-                      ? 'Webinars'
-                      : 'Advisory Services',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColorss.textPrimary,
+            child: Padding(
+              padding: mainPadding,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _selectedMenuItem == MenuItem.webinars
+                        ? Icons.video_call
+                        : Icons.support_agent,
+                    size: primaryIconSize * 2.5,
+                    color: AppColorss.primary.withOpacity(0.6),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _selectedMenuItem == MenuItem.webinars
-                      ? 'Navigate to this section from the sidebar'
-                      : 'Navigate to this section from the sidebar',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: AppColorss.textSecondary,
+                  SizedBox(height: primarySpacing),
+                  Text(
+                    _selectedMenuItem == MenuItem.webinars
+                        ? 'Webinars'
+                        : 'Advisory Services',
+                    style: GoogleFonts.poppins(
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.w600,
+                      color: AppColorss.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
-              ],
+                  SizedBox(height: secondarySpacing),
+                  Text(
+                    _selectedMenuItem == MenuItem.webinars
+                        ? 'Navigate to this section from the sidebar'
+                        : 'Navigate to this section from the sidebar',
+                    style: GoogleFonts.poppins(
+                      fontSize: bodyFontSize,
+                      color: AppColorss.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ),
         );
       default:
         return Container(
           child: Center(
-            child: Text(
-              'Select a section from the sidebar',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: AppColorss.textSecondary,
+            child: Padding(
+              padding: mainPadding,
+              child: Text(
+                'Select a section from the sidebar',
+                style: GoogleFonts.poppins(
+                  fontSize: bodyFontSize,
+                  color: AppColorss.textSecondary,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
@@ -1267,7 +1435,7 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
         // Categories dropdown for main content (only on mobile/when sidebar is closed)
         if (isMobile || _isSidebarCollapsed)
           Container(
-            padding: EdgeInsets.all(isMobile ? 16 : 20),
+            padding: mainPadding,
             child: CategoryDropdown(
               categories: _categories,
               selectedCategoryId: _selectedCategoryId,
@@ -1284,67 +1452,74 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(isMobile ? 24 : 32),
+        padding: mainPadding,
         child: SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: isMobile ? 100 : 120,
-                height: isMobile ? 100 : 120,
+                width: primaryIconSize * (isExtraSmall ? 3 : 4),
+                height: primaryIconSize * (isExtraSmall ? 3 : 4),
                 decoration: BoxDecoration(
                   color: AppColorss.error.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.error_outline,
-                  size: isMobile ? 48 : 64,
+                  size: primaryIconSize * (isExtraSmall ? 1.5 : 2),
                   color: AppColorss.error,
                 ),
               ),
-              SizedBox(height: isMobile ? 24 : 32),
+              SizedBox(height: primarySpacing * (isExtraSmall ? 1 : 1.5)),
 
               Text(
                 'Oops! Something went wrong',
                 style: GoogleFonts.poppins(
-                  fontSize: isMobile ? 18 : 24,
+                  fontSize: titleFontSize,
                   fontWeight: FontWeight.w700,
                   color: AppColorss.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: secondarySpacing),
 
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: primarySpacing),
                 child: Text(
                   _errorMessage ?? 'An unexpected error occurred',
                   style: GoogleFonts.poppins(
-                    fontSize: isMobile ? 14 : 16,
+                    fontSize: bodyFontSize,
                     color: AppColorss.textSecondary,
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,
-                  maxLines: 3,
+                  maxLines: isExtraSmall ? 2 : 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
 
-              SizedBox(height: isMobile ? 24 : 32),
+              SizedBox(height: primarySpacing * (isExtraSmall ? 1 : 1.5)),
 
               ElevatedButton.icon(
                 onPressed: _initializeData,
-                icon: const Icon(Icons.refresh),
+                icon: Icon(
+                  Icons.refresh,
+                  size: secondaryIconSize,
+                ),
                 label: Text(
                   'Try Again',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                    fontSize: bodyFontSize,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColorss.primary,
                   foregroundColor: Colors.white,
+                  minimumSize: Size(buttonMinWidth, buttonHeight),
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 24 : 32,
-                    vertical: isMobile ? 12 : 16,
+                    horizontal: primarySpacing,
+                    vertical: secondarySpacing,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1360,15 +1535,38 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   }
 
   Widget _buildFloatingActionButton() {
+    if (isExtraSmall) {
+      // Compact FAB for extra small screens
+      return FloatingActionButton(
+        onPressed: _showUploadDialog,
+        backgroundColor: AppColorss.primary,
+        foregroundColor: Colors.white,
+        elevation: 8,
+        child: Icon(
+          Icons.add,
+          size: primaryIconSize,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      );
+    }
+
     return FloatingActionButton.extended(
       onPressed: _showUploadDialog,
       backgroundColor: AppColorss.primary,
       foregroundColor: Colors.white,
       elevation: 8,
-      icon: const Icon(Icons.add),
+      icon: Icon(
+        Icons.add,
+        size: secondaryIconSize,
+      ),
       label: Text(
         isMobile ? 'Upload' : 'Upload Content',
-        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        style: GoogleFonts.poppins(
+          fontWeight: FontWeight.w600,
+          fontSize: bodyFontSize,
+        ),
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),

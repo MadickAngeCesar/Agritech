@@ -43,7 +43,6 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
     });
   }
 
-
   Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('jwt_token');
@@ -307,6 +306,37 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
     return null;
   }
 
+  // Responsive helper method
+  int _getCrossAxisCount(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth >= 1200) return 4;  // Desktop
+    if (screenWidth >= 900) return 3;   // Tablet landscape
+    if (screenWidth >= 600) return 2;   // Tablet portrait
+    return 2; // Mobile (changed from 1 to 2 for better mobile experience)
+  }
+
+  double _getChildAspectRatio(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = _getCrossAxisCount(context);
+
+    // Calculate available width per card
+    const horizontalPadding = 32.0; // Total horizontal padding
+    const crossAxisSpacing = 16.0;
+    final totalSpacing = (crossAxisCount - 1) * crossAxisSpacing;
+    final availableWidth = screenWidth - horizontalPadding - totalSpacing;
+    final cardWidth = availableWidth / crossAxisCount;
+
+    // Dynamic height calculation based on content
+    const imageHeight = 120.0; // Reduced from 150
+    const contentPadding = 12.0;
+    const titleHeight = 32.0; // 2 lines max
+    const buttonHeight = 40.0;
+    const spacing = 8.0;
+
+    final cardHeight = imageHeight + contentPadding * 2 + titleHeight + buttonHeight + spacing;
+
+    return cardWidth / cardHeight;
+  }
 
   Widget _buildGridProductCard(dynamic product) {
     final imageUrl = getImageUrl(product);
@@ -318,9 +348,9 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
         : product['price'] ?? 0.0);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         side: isFeatured
             ? BorderSide(color: AppColors.accent, width: 2)
             : BorderSide.none,
@@ -331,70 +361,107 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Product image with stack for featured badge
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: Stack(
-              children: [
-                SizedBox(
-                  height: 150,
-                  width: double.infinity,
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Shimmer.fromColors(
-                      baseColor: Colors.grey.shade200,
-                      highlightColor: Colors.grey.shade50,
-                      child: Container(
-                        color: Colors.white,
+          Expanded(
+            flex: 3,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: imageUrl != null
+                        ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey.shade200,
+                        highlightColor: Colors.grey.shade50,
+                        child: Container(
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(
+                          child: Icon(Icons.image_not_supported,
+                              size: 32, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                        : Container(
                       color: Colors.grey.shade100,
                       child: const Center(
                         child: Icon(Icons.image_not_supported,
-                            size: 40, color: Colors.grey),
-                      ),
-                    ),
-                  )
-                      : Container(
-                    color: Colors.grey.shade100,
-                    child: const Center(
-                      child: Icon(Icons.image_not_supported,
-                          size: 40, color: Colors.grey),
-                    ),
-                  ),
-                ),
-                // Overlay gradient at the bottom
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
+                            size: 32, color: Colors.grey),
                       ),
                     ),
                   ),
-                ),
-                // Featured badge
-                if (isFeatured)
+                  // Overlay gradient at the bottom
                   Positioned(
-                    top: 12,
-                    right: 12,
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.7),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Featured badge
+                  if (isFeatured)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.star, color: Colors.white, size: 10),
+                            SizedBox(width: 2),
+                            Text(
+                              'FEATURED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Price badge
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.2),
@@ -403,118 +470,88 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
                           ),
                         ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.star, color: Colors.white, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'FEATURED',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                // Price badge
-                Positioned(
-                  bottom: 12,
-                  left: 12,
-                  child: Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                      child: Text(
+                        '${price.toStringAsFixed(0)} XAF',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
                         ),
-                      ],
-                    ),
-                    child: Text(
-                      '${price.toStringAsFixed(0)} XAF',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
           // Product details
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product['name'] ?? 'Unnamed Product',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textDark,
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      product['name'] ?? 'Unnamed Product',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textDark,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Feature toggle button
-                    Material(
-                      color: isFeatured ? AppColors.accent.withOpacity(0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        onTap: () {
-                          toggleFeatured(product['id'], !isFeatured);
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(
-                            isFeatured ? Icons.star : Icons.star_border,
-                            color: isFeatured ? AppColors.accent : Colors.grey,
-                            size: 22,
+                  const SizedBox(height: 4),
+                  // Action buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Feature toggle button
+                      Material(
+                        color: isFeatured ? AppColors.accent.withOpacity(0.1) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                        child: InkWell(
+                          onTap: () {
+                            toggleFeatured(product['id'], !isFeatured);
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6.0),
+                            child: Icon(
+                              isFeatured ? Icons.star : Icons.star_border,
+                              color: isFeatured ? AppColors.accent : Colors.grey,
+                              size: 18,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // Delete button
-                    Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      child: InkWell(
-                        onTap: () {
-                          deleteProduct(product['id'], product['name'] ?? 'This product');
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Icon(
-                            Icons.delete_outline,
-                            color: AppColors.error,
-                            size: 22,
+                      // Delete button
+                      Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                        child: InkWell(
+                          onTap: () {
+                            deleteProduct(product['id'], product['name'] ?? 'This product');
+                          },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6.0),
+                            child: Icon(
+                              Icons.delete_outline,
+                              color: AppColors.error,
+                              size: 18,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -532,9 +569,9 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
         : product['price'] ?? 0.0);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         side: isFeatured
             ? BorderSide(color: AppColors.accent, width: 2)
             : BorderSide.none,
@@ -542,7 +579,7 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
       elevation: 2,
       shadowColor: Colors.black26,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           // Navigate to product details if needed
         },
@@ -552,14 +589,14 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
             // Image section
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
               ),
               child: Stack(
                 children: [
                   SizedBox(
-                    width: 120,
-                    height: 140,
+                    width: 100,
+                    height: 120,
                     child: imageUrl != null
                         ? CachedNetworkImage(
                       imageUrl: imageUrl,
@@ -575,7 +612,7 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
                         color: Colors.grey.shade100,
                         child: const Center(
                           child: Icon(Icons.image_not_supported,
-                              size: 40, color: Colors.grey),
+                              size: 32, color: Colors.grey),
                         ),
                       ),
                     )
@@ -583,20 +620,20 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
                       color: Colors.grey.shade100,
                       child: const Center(
                         child: Icon(Icons.image_not_supported,
-                            size: 40, color: Colors.grey),
+                            size: 32, color: Colors.grey),
                       ),
                     ),
                   ),
                   if (isFeatured)
                     Positioned(
-                      top: 8,
-                      left: 8,
+                      top: 6,
+                      left: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: AppColors.accent,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.2),
@@ -608,7 +645,7 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
                         child: const Icon(
                           Icons.star,
                           color: Colors.white,
-                          size: 14,
+                          size: 12,
                         ),
                       ),
                     ),
@@ -904,9 +941,9 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
       child: isGridView
           ? GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.75,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _getCrossAxisCount(context),
+          childAspectRatio: _getChildAspectRatio(context),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
         ),
@@ -915,51 +952,59 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
           return Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  height: 150,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(16)),
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(12)),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 16,
-                        width: 120,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 14,
-                        width: 80,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            height: 30,
-                            width: 30,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 12,
+                            width: double.infinity,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              height: 24,
+                              width: 24,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            Container(
+                              height: 24,
+                              width: 24,
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -972,20 +1017,20 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
         itemCount: 6,
         itemBuilder: (context, index) {
           return Container(
-            height: 140,
-            margin: const EdgeInsets.only(bottom: 16),
+            height: 120,
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 120,
+                  width: 100,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.horizontal(
-                        left: Radius.circular(16)),
+                        left: Radius.circular(12)),
                   ),
                 ),
                 Expanded(
@@ -1073,84 +1118,87 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
         ),
       ),
       child: Scaffold(
-        appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                showOnlyFeatured ? "Featured Products" : "All Products",
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
-              ),
-              Text(
-                "Agricultural Store Admin",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
-                  fontWeight: FontWeight.w300,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            // View toggle button
-            IconButton(
-              icon: Icon(
-                isGridView ? Icons.view_list : Icons.grid_view,
-                color: Colors.white,
-              ),
-              tooltip: isGridView ? 'Switch to list view' : 'Switch to grid view',
-              onPressed: () {
-                setState(() {
-                  isGridView = !isGridView;
-                });
-              },
-            ),
-            // Featured filter button
-            IconButton(
-              icon: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    Icons.star,
-                    color: showOnlyFeatured
-                        ? AppColors.accent
-                        : Colors.white.withOpacity(0.7),
-                    size: 28,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  showOnlyFeatured ? "Featured Products" : "All Products",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
-                  if (showOnlyFeatured)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
+                ),
+                Text(
+                  "Agricultural Store Admin",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withOpacity(0.8),
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              // View toggle button
+              IconButton(
+                icon: Icon(
+                  isGridView ? Icons.view_list : Icons.grid_view,
+                  color: Colors.white,
+                ),
+                tooltip: isGridView ? 'Switch to list view' : 'Switch to grid view',
+                onPressed: () {
+                  setState(() {
+                    isGridView = !isGridView;
+                  });
+                },
+              ),
+              // Featured filter button
+              IconButton(
+                icon: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.star,
+                      color: showOnlyFeatured
+                          ? AppColors.accent
+                          : Colors.white.withOpacity(0.7),
+                      size: 28,
+                    ),
+                    if (showOnlyFeatured)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
+                tooltip: showOnlyFeatured ? 'Show all products' : 'Show only featured',
+                onPressed: () {
+                  setState(() {
+                    showOnlyFeatured = !showOnlyFeatured;
+                  });
+                  fetchProducts();
+                },
               ),
-              tooltip: showOnlyFeatured ? 'Show all products' : 'Show only featured',
-              onPressed: () {
-                setState(() {
-                  showOnlyFeatured = !showOnlyFeatured;
-                });
-                fetchProducts();
-              },
-            ),
-            // Refresh button
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              tooltip: 'Refresh products',
-              onPressed: fetchProducts,
-            ),
-            const SizedBox(width: 8),
-          ],
+              // Refresh button
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                tooltip: 'Refresh products',
+                onPressed: fetchProducts,
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
         ),
         body: RefreshIndicator(
           onRefresh: fetchProducts,
@@ -1165,9 +1213,9 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
               ? GridView.builder(
             padding: const EdgeInsets.all(16),
             gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.75,
+            SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _getCrossAxisCount(context),
+              childAspectRatio: _getChildAspectRatio(context),
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
@@ -1189,7 +1237,12 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
             // Navigate to add product screen
             // Navigator.push(context, MaterialPageRoute(builder: (context) => AddProductScreen()));
           },
-          label: const Text("Add Product"),
+          label: Text(
+            "Add Product",
+            style: TextStyle(
+              fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14,
+            ),
+          ),
           icon: const Icon(Icons.add),
           elevation: 4,
         ),
