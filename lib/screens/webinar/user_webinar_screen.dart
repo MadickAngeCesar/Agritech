@@ -55,7 +55,7 @@ class _UserWebinarScreenState extends State<UserWebinarScreen>
 
   Future<void> fetchWebinars() async {
     setState(() => isLoading = true);
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars/upcoming');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars/upcoming');
 
     debugPrint("📱 Fetching webinars from: $url");
 
@@ -89,7 +89,7 @@ class _UserWebinarScreenState extends State<UserWebinarScreen>
   }
 
   Future<void> joinWebinar(int webinarId, String jitsiUrl) async {
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars/$webinarId/join');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars/$webinarId/join');
 
     debugPrint("🎯 Attempting to join webinar: ID=$webinarId, URL=$jitsiUrl");
 

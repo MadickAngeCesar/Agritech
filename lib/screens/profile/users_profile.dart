@@ -29,7 +29,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void initState() {
     super.initState();
     _apiService = ApiService(
-      baseUrl: 'http://10.0.2.2:3000',
+      baseUrl: 'http://51.75.31.246:3000',
       token: widget.token,
     );
     _loadUserProfile();

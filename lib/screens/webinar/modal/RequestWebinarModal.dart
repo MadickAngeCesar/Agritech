@@ -214,7 +214,7 @@ class _RequestWebinarModalState extends State<RequestWebinarModal>
     debugPrint("  User ID: ${widget.userId}");
     debugPrint("  Image Path: ${imageFile?.path}");
 
-    final uri = Uri.parse('http://10.0.2.2:3000/api/webinars/request');
+    final uri = Uri.parse('http://51.75.31.246:3000/api/webinars/request');
     final request = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer ${widget.token}'
       ..fields['title'] = _titleController.text

@@ -33,7 +33,7 @@ class _UserProductDetailsScreenState extends State<UserProductDetailsScreen> {
 
     try {
       final response = await http.delete(
-        Uri.parse('http://10.0.2.2:3000/api/products/${widget.product['id']}'),
+        Uri.parse('http://51.75.31.246:3000/api/products/${widget.product['id']}'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -175,7 +175,7 @@ class _UserProductDetailsScreenState extends State<UserProductDetailsScreen> {
                         },
                         itemBuilder: (context, index) {
                           return Image.network(
-                            'http://10.0.2.2:3000${imageUrls[index]}',
+                            'http://51.75.31.246:3000${imageUrls[index]}',
                             fit: BoxFit.cover,
                             width: double.infinity,
                             errorBuilder: (context, error, stackTrace) =>

@@ -1,4 +1,3 @@
-// lib/models/video_model.dart
 class Video {
   final int id;
   final String title;
@@ -10,6 +9,9 @@ class Video {
   final Duration? duration;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isNew;
+  final int likes;
+  final int dislikes;
 
   Video({
     required this.id,
@@ -22,6 +24,9 @@ class Video {
     this.duration,
     this.createdAt,
     this.updatedAt,
+    this.isNew = false,
+    this.likes = 0,
+    this.dislikes = 0,
   });
 
   factory Video.fromJson(Map<String, dynamic> json) {
@@ -42,6 +47,9 @@ class Video {
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'])
           : null,
+      isNew: json['isNew'] ?? false,
+      likes: json['likes'] ?? 0,
+      dislikes: json['dislikes'] ?? 0,
     );
   }
 
@@ -57,11 +65,11 @@ class Video {
       if (duration != null) 'duration': duration!.inSeconds,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+      'likes': likes,
+      'dislikes': dislikes,
     };
   }
 
-  String get fullThumbnailUrl => thumbnailUrl ?? '';
-  String get fullVideoUrl => videoUrl ?? '';
   String get formattedDuration {
     if (duration == null) return '';
     final hours = duration!.inHours;
@@ -73,18 +81,4 @@ class Video {
     }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
-
-  @override
-  String toString() {
-    return 'Video(id: $id, title: $title, categoryId: $categoryId, duration: $formattedDuration)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is Video && other.id == id;
-  }
-
-  @override
-  int get hashCode => id.hashCode;
 }

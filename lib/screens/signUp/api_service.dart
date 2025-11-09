@@ -13,7 +13,7 @@ Future<void> registerUser({
   required DateTime dateOfBirth,
   required File profileImage,
 }) async {
-  final uri = Uri.parse('http://10.0.2.2:3000/api/users/register');
+  final uri = Uri.parse('http://51.75.31.246:3000/api/users/register');
 
   var request = http.MultipartRequest('POST', uri);
 

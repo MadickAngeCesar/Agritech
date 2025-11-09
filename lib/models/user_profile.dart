@@ -59,7 +59,7 @@ class UserProfile {
       profileImage: json['profile_image'] != null
           ? (json['profile_image'].toString().startsWith('http')
           ? json['profile_image']
-          : 'http://10.0.2.2:3000/uploads/${json['profile_image']}')
+          : 'http://51.75.31.246:3000/uploads/${json['profile_image']}')
           : null,
       bio: json['bio'],
       facebook: json['facebook'],

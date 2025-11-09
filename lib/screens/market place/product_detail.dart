@@ -39,7 +39,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _apiService = ApiService(
-      baseUrl: 'http://10.0.2.2:3000',
+      baseUrl: 'http://51.75.31.246:3000',
       token: widget.token,
     );
     _loadProductDetails();

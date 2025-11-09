@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 class AppConstants {
   // API Configuration
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  static const String baseUrl = 'http://51.75.31.246:3000/api';
   static const Duration apiTimeout = Duration(seconds: 15);
   static const Duration uploadTimeout = Duration(minutes: 5);
 

@@ -49,7 +49,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   void initState() {
     super.initState();
     _apiService = ApiService(
-      baseUrl: 'http://10.0.2.2:3000/api',
+      baseUrl: 'http://51.75.31.246:3000/api',
       token: widget.token,
     );
     _fetchOrders();

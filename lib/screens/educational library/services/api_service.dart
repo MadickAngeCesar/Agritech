@@ -9,7 +9,7 @@ import '../model/video_model.dart';
 
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
+  static const String baseUrl = 'http://51.75.31.246:3000/api';
   static const Duration timeoutDuration = Duration(seconds: 15);
 
   final String? _token;
@@ -328,7 +328,7 @@ class ApiService {
 
 
 
-  static const String baseUrlImage = 'http://10.0.2.2:3000';
+  static const String baseUrlImage = 'http://51.75.31.246:3000';
 
   static String getFullUrl(String? path) {
     print('🔍 ApiService.getFullUrl called with: "$path"');

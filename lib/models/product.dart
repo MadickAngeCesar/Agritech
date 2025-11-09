@@ -42,7 +42,7 @@ class Product {
 
     // ✅ Safely parse and prefix images
     List<String>? imagesList;
-    const baseUrl = 'http://10.0.2.2:3000/uploads';
+    const baseUrl = 'http://51.75.31.246:3000/uploads';
 
     if (json['images'] != null) {
       if (json['images'] is List) {

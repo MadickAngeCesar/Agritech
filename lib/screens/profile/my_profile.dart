@@ -61,7 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   static const Color cardColor = Colors.white;
   static const Color warningOrange = Color(0xFFFF8A65);
 
-  static const String apiUrl = 'http://10.0.2.2:3000/api/myprofile';
+  static const String apiUrl = 'http://51.75.31.246:3000/api/myprofile';
 
   @override
   void initState() {
@@ -1098,7 +1098,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => CameraCaptureScreen(onImageCaptured: (File image) {  },),
+                              builder: (_) => CameraCaptureScreen(),
                             ),
                           );
                         },
@@ -1377,7 +1377,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                               try {
                                 final response = await http.post(
-                                  Uri.parse('http://10.0.2.2:3000/api/users/change-password'),
+                                  Uri.parse('http://51.75.31.246:3000/api/users/change-password'),
                                   headers: {
                                     'Content-Type': 'application/json',
                                     'Authorization': 'Bearer ${widget.token}',

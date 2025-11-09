@@ -65,7 +65,7 @@ class ProductCard extends StatelessWidget {
                           ? Image.network(
                         product.images!.first.startsWith('http')
                             ? product.images!.first
-                            : 'http://10.0.2.2:3000${product.images!.first}',
+                            : 'http://51.75.31.246:3000${product.images!.first}',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(

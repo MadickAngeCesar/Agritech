@@ -46,7 +46,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const Color darkTextColor = Color(0xFFE0E0E0);
   static const Color lightTextColor = Color(0xFF424242);
 
-  static const String apiUrl = 'http://10.0.2.2:3000/api/myprofile';
+  static const String apiUrl = 'http://51.75.31.246:3000/api/myprofile';
 
   @override
   void initState() {

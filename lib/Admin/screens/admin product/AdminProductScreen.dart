@@ -31,7 +31,7 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
   String? errorMessage;
   bool isGridView = true; // Toggle between grid and list view
 
-  final String baseUrl = 'http://10.0.2.2:3000'; // Emulator base URL
+  final String baseUrl = 'http://51.75.31.246:3000'; // Emulator base URL
 
   @override
   void initState() {

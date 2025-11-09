@@ -43,7 +43,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/api/orders/my-products/orders'),
+        Uri.parse('http://51.75.31.246:3000/api/orders/my-products/orders'),
         headers: {'Authorization': 'Bearer ${widget.token}'},
       ).timeout(const Duration(seconds: 30));
 
@@ -112,7 +112,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
     try {
       final response = await http.put(
-        Uri.parse('http://10.0.2.2:3000/api/orders/$orderId/cancel'),
+        Uri.parse('http://51.75.31.246:3000/api/orders/$orderId/cancel'),
         headers: {'Authorization': 'Bearer ${widget.token}'},
       ).timeout(const Duration(seconds: 30));
 

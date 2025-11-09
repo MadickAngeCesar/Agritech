@@ -134,10 +134,7 @@ class FarmConnectNavBar extends StatelessWidget {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MyAi(
-            userData: userData,
-            token: token,
-          ),
+          builder: (context) => MyAI()
         ),
       );
       break;

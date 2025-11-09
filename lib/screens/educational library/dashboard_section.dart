@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'package:agritech/screens/educational%20library/services/api_service.dart';
 import 'package:agritech/screens/educational%20library/utils/constants.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'model/ebook_model.dart';
 import 'model/video_model.dart';
@@ -47,6 +49,89 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
     _initializeAnimations();
     _loadMarketplaceData();
   }
+
+
+  Future<void> _onDownloadPressed(Video video) async {
+    if (video.videoUrl == null || video.videoUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No video URL available to download.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final filePath = '${dir.path}/${video.title.replaceAll(" ", "_")}.mp4';
+
+      Dio dio = Dio();
+
+      await dio.download(
+        video.videoUrl!,
+        filePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            // optional progress UI
+            print(
+                "Download progress: ${(received / total * 100).toStringAsFixed(0)}%");
+          }
+        },
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Video downloaded successfully!'),
+        ),
+      );
+    } catch (e) {
+      print(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Download failed: ${e.toString()}'),
+        ),
+      );
+    }
+  }
+
+  void _onLikePressed(Video video) {
+    // TODO: replace with real API call
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Liked: ${video.title}',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _onDislikePressed(Video video) {
+    // TODO: replace with real API call
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Disliked: ${video.title}',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+
+
 
   void _initializeAnimations() {
     _animationController = AnimationController(
@@ -526,6 +611,16 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
     String duration = _getItemDuration(item);
     String price = _getItemPrice(item);
 
+    bool isNew = false;
+    int likes = 0;
+    int dislikes = 0;
+
+    if (item is Video) {
+      isNew = item.isNew;
+      likes = item.likes;
+      dislikes = item.dislikes;
+    }
+
     return InkWell(
       onTap: () => _onItemTap(item),
       borderRadius: BorderRadius.circular(16),
@@ -546,7 +641,7 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with image or gradient background
+            // Header with image
             Container(
               height: 120,
               decoration: BoxDecoration(
@@ -560,12 +655,12 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
                 ),
                 child: Stack(
                   children: [
-                    // Background image or gradient
+                    // Background image
                     Positioned.fill(
                       child: _buildItemImage(item, color),
                     ),
 
-                    // Gradient overlay for better text visibility
+                    // Gradient overlay
                     Positioned.fill(
                       child: Container(
                         decoration: BoxDecoration(
@@ -618,6 +713,32 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
                         ),
                       ),
                     ),
+
+                    // NEW badge for new videos
+                    if (isNew)
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'NEW',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                      ),
 
                     // Center play icon for videos
                     if (item is Video)
@@ -676,6 +797,28 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+
+                    // ⭐ Ratings for ebooks
+                    if (item is Ebook) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.star,
+                              color: Colors.amber, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${item.ratingsAverage.toStringAsFixed(1)} '
+                                '(${item.ratingsCount} ratings)',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: AppColorss.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 8),
                     Expanded(
                       child: Text(
@@ -691,10 +834,44 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
                     ),
                     const SizedBox(height: 12),
 
-                    // Footer with price only
+                    // Footer with actions
                     Row(
                       children: [
-                        const Spacer(),
+                        if (item is Video) ...[
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.thumb_up_alt_outlined,
+                                    color: Colors.green, size: 18),
+                                onPressed: () => _onLikePressed(item),
+                                tooltip: 'Like',
+                              ),
+                              Text(
+                                '$likes',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              ),
+                              SizedBox(width: 8),
+                              IconButton(
+                                icon: Icon(Icons.thumb_down_alt_outlined,
+                                    color: Colors.red, size: 18),
+                                onPressed: () => _onDislikePressed(item),
+                                tooltip: 'Dislike',
+                              ),
+                              Text(
+                                '$dislikes',
+                                style: GoogleFonts.poppins(fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          Spacer(),
+                          IconButton(
+                            icon: Icon(Icons.download,
+                                color: Colors.blue, size: 20),
+                            onPressed: () => _onDownloadPressed(item),
+                            tooltip: 'Download',
+                          ),
+                        ] else
+                          Spacer(),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -836,9 +1013,10 @@ class _MarketplaceDashboardState extends State<MarketplaceDashboard>
 
   String _getItemAuthor(dynamic item) {
     if (item is Video) return item.categoryName ?? 'AgriTech Expert';
-    if (item is Ebook) return item.categoryName ?? 'AgriTech Authors';
+    if (item is Ebook) return item.authorName ?? 'AgriTech Authors';
     return item['host']?['full_name'] ?? 'Expert Instructor';
   }
+
 
   String _getItemDescription(dynamic item) {
     if (item is Video) {

@@ -56,7 +56,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
 
   // Helper method to get full URL
   String _getFullUrl(String? path) {
-    const String baseUrlImage = 'http://10.0.2.2:3000';
+    const String baseUrlImage = 'http://51.75.31.246:3000';
 
     if (path == null || path.trim().isEmpty) {
       return '';

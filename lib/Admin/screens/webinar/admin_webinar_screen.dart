@@ -43,7 +43,7 @@ class _AdminWebinarManagementScreenState extends State<AdminWebinarManagementScr
 
   Future<void> fetchPendingRequests() async {
     setState(() => isLoading = true);
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars/requests/pending');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars/requests/pending');
 
     final response = await http.get(url, headers: {
       'Authorization': 'Bearer ${widget.token}',
@@ -61,7 +61,7 @@ class _AdminWebinarManagementScreenState extends State<AdminWebinarManagementScr
   }
 
   Future<void> approveRequest(int requestId) async {
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars/approve/$requestId');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars/approve/$requestId');
 
     final response = await http.post(url, headers: {
       'Authorization': 'Bearer ${widget.token}',
@@ -77,7 +77,7 @@ class _AdminWebinarManagementScreenState extends State<AdminWebinarManagementScr
   }
 
   Future<void> rejectRequest(int requestId, String reason) async {
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars/reject/$requestId');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars/reject/$requestId');
 
     final response = await http.post(
       url,
@@ -445,7 +445,7 @@ class _AdminWebinarManagementScreenState extends State<AdminWebinarManagementScr
       return;
     }
 
-    final url = Uri.parse('http://10.0.2.2:3000/api/webinars');
+    final url = Uri.parse('http://51.75.31.246:3000/api/webinars');
     final request = http.MultipartRequest('POST', url);
     request.headers['Authorization'] = 'Bearer ${widget.token}';
 

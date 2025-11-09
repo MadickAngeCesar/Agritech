@@ -72,7 +72,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
 
     // Initialize API service and load data
     _apiService = ApiService(
-      baseUrl: 'http://10.0.2.2:3000',
+      baseUrl: 'http://51.75.31.246:3000',
       token: widget.token,
     );
     _loadData();

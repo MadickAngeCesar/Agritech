@@ -1,622 +1,671 @@
+import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CameraCaptureScreen extends StatefulWidget {
-  final Function(File image) onImageCaptured;
-
-  const CameraCaptureScreen({Key? key, required this.onImageCaptured}) : super(key: key);
-
   @override
-  State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
+  _CameraCaptureScreenState createState() => _CameraCaptureScreenState();
 }
 
 class _CameraCaptureScreenState extends State<CameraCaptureScreen>
-    with WidgetsBindingObserver {
-  CameraController? _controller;
-  Future<void>? _initializeControllerFuture;
-  List<CameraDescription> cameras = [];
-  bool _isInitialized = false;
-  bool _isCapturing = false;
-  int _currentCameraIndex = 0;
-  bool _hasError = false;
-  String _errorMessage = '';
-  bool _showGrid = true;
+    with TickerProviderStateMixin {
+  File? _imageFile;
+  bool _isLoading = false;
+  String? _errorMessage;
+  Map<String, dynamic>? _result;
+  List<Map<String, dynamic>> _recentAnalysis = [];
+
+  final ImagePicker _picker = ImagePicker();
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeCamera();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
+    );
+    _fadeController.forward();
+    _loadRecentAnalysis();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
-    // Restore orientation settings
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
+    _fadeController.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return;
+  Future<void> _loadRecentAnalysis() async {
+    final prefs = await SharedPreferences.getInstance();
+    final analysisJson = prefs.getStringList('recent_analysis') ?? [];
+    setState(() {
+      _recentAnalysis = analysisJson
+          .map((json) => Map<String, dynamic>.from(jsonDecode(json)))
+          .toList();
+    });
+  }
+
+  Future<void> _saveAnalysis(Map<String, dynamic> analysis) async {
+    final prefs = await SharedPreferences.getInstance();
+    final analysisData = {
+      'timestamp': DateTime.now().toIso8601String(),
+      'isHealthy': analysis['isHealthy'],
+      'diseases': analysis['diseases'],
+      'suggestions': analysis['suggestions'],
+    };
+
+    _recentAnalysis.insert(0, analysisData);
+    if (_recentAnalysis.length > 5) {
+      _recentAnalysis = _recentAnalysis.take(5).toList();
     }
 
-    if (state == AppLifecycleState.inactive) {
-      _controller?.dispose();
-    } else if (state == AppLifecycleState.resumed) {
-      _initializeCamera();
+    final analysisJson = _recentAnalysis.map((data) => jsonEncode(data)).toList();
+    await prefs.setStringList('recent_analysis', analysisJson);
+    setState(() {});
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final pickedFile = await _picker.pickImage(source: source, imageQuality: 80);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+        _errorMessage = null;
+        _result = null;
+      });
+      _scaleController.forward();
+      _uploadImage(_imageFile!);
     }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _uploadImage(File imageFile) async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
-      setState(() {
-        _hasError = false;
-        _errorMessage = '';
-      });
-
-      cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'No cameras available on this device';
-        });
-        return;
-      }
-
-      final camera = cameras.length > _currentCameraIndex
-          ? cameras[_currentCameraIndex]
-          : cameras.first;
-
-      _controller = CameraController(
-        camera,
-        ResolutionPreset.high,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("http://51.75.31.246:3000/api/detect-plant-disease"),
       );
 
-      _initializeControllerFuture = _controller!.initialize();
-      await _initializeControllerFuture;
+      request.files.add(
+        await http.MultipartFile.fromPath("image", imageFile.path),
+      );
 
-      if (mounted) {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         setState(() {
-          _isInitialized = true;
+          _result = data;
+        });
+        await _saveAnalysis(data);
+      } else {
+        setState(() {
+          _errorMessage = "Server error: ${response.statusCode}";
         });
       }
     } catch (e) {
       setState(() {
-        _hasError = true;
-        _errorMessage = 'Failed to initialize camera: ${e.toString()}';
+        _errorMessage = "Network error. Please check your connection.";
       });
-      print("Error initializing camera: $e");
-    }
-  }
-
-  Future<void> _takePicture() async {
-    if (_isCapturing) return;
-
-    try {
+    } finally {
       setState(() {
-        _isCapturing = true;
+        _isLoading = false;
       });
-
-      if (_controller == null || !_controller!.value.isInitialized) {
-        throw Exception('Camera not initialized');
-      }
-
-      await _initializeControllerFuture;
-      final image = await _controller!.takePicture();
-
-      // Add haptic feedback
-      HapticFeedback.mediumImpact();
-
-      widget.onImageCaptured(File(image.path));
-
-      if (mounted) {
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isCapturing = false;
-        });
-        _showErrorSnackBar('Failed to take picture: ${e.toString()}');
-      }
-      print("Error taking picture: $e");
     }
   }
 
-  Future<void> _switchCamera() async {
-    if (cameras.length < 2) return;
-
-    setState(() {
-      _currentCameraIndex = (_currentCameraIndex + 1) % cameras.length;
-      _isInitialized = false;
-    });
-
-    await _controller?.dispose();
-    await _initializeCamera();
-  }
-
-  void _toggleGrid() {
-    setState(() {
-      _showGrid = !_showGrid;
-    });
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(fontFamily: 'Poppins'),
+  Widget _buildInstructions() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade50, Colors.green.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        backgroundColor: Colors.red[600],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: EdgeInsets.all(_getResponsiveSize(context, 16)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.green.shade600, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                "How to use",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.green.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildInstructionItem("📸", "Take a clear photo of the affected plant"),
+          _buildInstructionItem("🔍", "Ensure good lighting and focus"),
+          _buildInstructionItem("📱", "Keep the camera steady for best results"),
+          _buildInstructionItem("🌿", "Include leaves and affected areas"),
+        ],
       ),
     );
   }
 
-  double _getResponsiveSize(BuildContext context, double baseSize) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    final shortestSide = min(screenWidth, screenHeight);
-
-    // Scale based on device size (375 is iPhone 6/7/8 width as baseline)
-    final scaleFactor = shortestSide / 375;
-    return baseSize * scaleFactor.clamp(0.8, 1.3);
-  }
-
-  // Get responsive padding
-  EdgeInsets _getResponsivePadding(BuildContext context, {
-    double horizontal = 16,
-    double vertical = 16,
-  }) {
-    return EdgeInsets.symmetric(
-      horizontal: _getResponsiveSize(context, horizontal),
-      vertical: _getResponsiveSize(context, vertical),
-    );
-  }
-
-  Widget _buildCameraPreview() {
-    if (!_isInitialized || _controller == null) {
-      return Container(
-        color: Colors.black,
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: _getResponsiveSize(context, 3),
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest;
-        final deviceRatio = size.width / size.height;
-        final cameraRatio = _controller!.value.aspectRatio;
-
-        double scale;
-        if (deviceRatio > cameraRatio) {
-          // Screen is wider than camera aspect ratio
-          scale = size.width / (size.height * cameraRatio);
-        } else {
-          // Screen is taller than camera aspect ratio
-          scale = size.height / (size.width / cameraRatio);
-        }
-
-        return ClipRect(
-          child: Transform.scale(
-            scale: scale,
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: cameraRatio,
-                child: CameraPreview(_controller!),
+  Widget _buildInstructionItem(String icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.green.shade600,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildActionButtons() {
     return Container(
-      color: Colors.black,
-      child: Center(
-        child: Padding(
-          padding: _getResponsivePadding(context, horizontal: 24, vertical: 24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.camera_alt,
+              label: "Take Photo",
+              onPressed: () => _pickImage(ImageSource.camera),
+              color: Colors.green,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.photo_library,
+              label: "Gallery",
+              onPressed: () => _pickImage(ImageSource.gallery),
+              color: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white),
+      label: Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 4,
+        shadowColor: color.withOpacity(0.4),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    if (_imageFile == null) return const SizedBox.shrink();
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        margin: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.file(
+            _imageFile!,
+            height: 200,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResult() {
+    if (_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "Analyzing plant...",
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade600),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _errorMessage!,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_result == null) return const SizedBox.shrink();
+
+    return _buildAnalysisResult(_result!);
+  }
+
+  Widget _buildAnalysisResult(Map<String, dynamic> result) {
+    final isHealthy = result['isHealthy'];
+    final diseases = result['diseases'] as List<dynamic>;
+    final suggestions = result['suggestions'] as List<dynamic>;
+
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Icon(
-                Icons.camera_alt_outlined,
-                size: _getResponsiveSize(context, 80),
-                color: Colors.white54,
+                isHealthy ? Icons.check_circle : Icons.warning,
+                color: isHealthy ? Colors.green : Colors.orange,
+                size: 32,
               ),
-              SizedBox(height: _getResponsiveSize(context, 24)),
-              Text(
-                'Camera Error',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: _getResponsiveSize(context, 24),
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: _getResponsiveSize(context, 12)),
-              Text(
-                _errorMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: _getResponsiveSize(context, 16),
-                  color: Colors.white70,
-                ),
-              ),
-              SizedBox(height: _getResponsiveSize(context, 24)),
-              ElevatedButton.icon(
-                onPressed: _initializeCamera,
-                icon: Icon(
-                  Icons.refresh,
-                  size: _getResponsiveSize(context, 20),
-                ),
-                label: Text(
-                  'Retry',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: _getResponsiveSize(context, 16),
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: _getResponsiveSize(context, 24),
-                    vertical: _getResponsiveSize(context, 12),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(_getResponsiveSize(context, 12)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  isHealthy ? "Healthy Plant" : "Disease Detected",
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: isHealthy ? Colors.green : Colors.orange,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isSmallScreen = screenHeight < 700;
-    final controlBarHeight = isSmallScreen ? 100.0 : 120.0;
-
-    return Container(
-      height: controlBarHeight + MediaQuery.of(context).padding.bottom,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black.withOpacity(0.7),
-            Colors.black.withOpacity(0.9),
+          const SizedBox(height: 20),
+          if (diseases.isNotEmpty) ...[
+            Text(
+              "Detected Diseases:",
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...diseases.map((disease) => _buildDiseaseCard(disease)),
           ],
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: _getResponsivePadding(context, horizontal: 24, vertical: 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildControlButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icons.photo_library,
-                size: _getResponsiveSize(context, 50),
-                iconSize: _getResponsiveSize(context, 24),
+          if (suggestions.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              "Recommendations:",
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
               ),
-
-              GestureDetector(
-                onTap: _isCapturing ? null : _takePicture,
-                child: Container(
-                  width: _getResponsiveSize(context, 80),
-                  height: _getResponsiveSize(context, 80),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        spreadRadius: 2,
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: _isCapturing
-                      ? Center(
-                    child: SizedBox(
-                      width: _getResponsiveSize(context, 30),
-                      height: _getResponsiveSize(context, 30),
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      ),
-                    ),
-                  )
-                      : Container(
-                    margin: EdgeInsets.all(_getResponsiveSize(context, 8)),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.green[600],
-                    ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: _getResponsiveSize(context, 32),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Switch Camera Button
-              _buildControlButton(
-                onPressed: cameras.length > 1 ? _switchCamera : null,
-                icon: Icons.flip_camera_ios,
-                size: _getResponsiveSize(context, 50),
-                iconSize: _getResponsiveSize(context, 24),
-                isEnabled: cameras.length > 1,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required VoidCallback? onPressed,
-    required IconData icon,
-    required double size,
-    required double iconSize,
-    bool isEnabled = true,
-  }) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(_getResponsiveSize(context, 12)),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
-      ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          color: isEnabled
-              ? Colors.white
-              : Colors.white.withOpacity(0.5),
-          size: iconSize,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar() {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final isSmallScreen = screenHeight < 700;
-    final topBarHeight = isSmallScreen ? 80.0 : 100.0;
-
-    return Container(
-      height: topBarHeight + MediaQuery.of(context).padding.top,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.9),
-            Colors.black.withOpacity(0.7),
-            Colors.transparent,
+            ),
+            const SizedBox(height: 12),
+            ...suggestions.map((suggestion) => _buildSuggestionItem(suggestion)),
           ],
-        ),
+        ],
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: _getResponsivePadding(context, horizontal: 16, vertical: 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  Widget _buildDiseaseCard(Map<String, dynamic> disease) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            disease['name'],
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.red.shade800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Confidence: ${(disease['probability'] * 100).toStringAsFixed(1)}%",
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          if (disease['treatment'] != null) ...[
+            const SizedBox(height: 12),
+            if (disease['treatment']['chemical'] != null &&
+                disease['treatment']['chemical'].isNotEmpty)
+              _buildTreatmentSection(
+                "Chemical Treatment:",
+                disease['treatment']['chemical'],
+                Icons.science,
+              ),
+            if (disease['treatment']['biological'] != null &&
+                disease['treatment']['biological'].isNotEmpty)
+              _buildTreatmentSection(
+                "Biological Treatment:",
+                disease['treatment']['biological'],
+                Icons.eco,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTreatmentSection(String title, List<dynamic> treatments, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Back Button
-              _buildTopBarButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icons.arrow_back_ios,
-              ),
-
-              // Title
+              Icon(icon, size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 8),
               Text(
-                'Take Photo',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: _getResponsiveSize(context, 20),
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade700,
                 ),
-              ),
-
-              // Grid Toggle Button
-              _buildTopBarButton(
-                onPressed: _toggleGrid,
-                icon: _showGrid ? Icons.grid_on : Icons.grid_off,
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            treatments.join(', '),
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTopBarButton({
-    required VoidCallback onPressed,
-    required IconData icon,
-  }) {
-    final buttonSize = _getResponsiveSize(context, 44);
+  Widget _buildSuggestionItem(String suggestion) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lightbulb_outline,
+            size: 16,
+            color: Colors.green.shade600,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              suggestion,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentAnalysis() {
+    if (_recentAnalysis.isEmpty) return const SizedBox.shrink();
+
     return Container(
-      width: buttonSize,
-      height: buttonSize,
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(_getResponsiveSize(context, 12)),
-        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          color: Colors.white,
-          size: _getResponsiveSize(context, 20),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history, color: Colors.grey.shade600),
+              const SizedBox(width: 12),
+              Text(
+                "Recent Analysis",
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ..._recentAnalysis.map((analysis) => _buildRecentAnalysisItem(analysis)),
+        ],
       ),
     );
   }
 
-  Widget _buildCameraGrid() {
-    if (!_showGrid) return const SizedBox.shrink();
+  Widget _buildRecentAnalysisItem(Map<String, dynamic> analysis) {
+    final isHealthy = analysis['isHealthy'];
+    final timestamp = DateTime.parse(analysis['timestamp']);
+    final timeAgo = _getTimeAgo(timestamp);
 
-    return CustomPaint(
-      painter: ResponsiveGridPainter(context),
-      child: Container(),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isHealthy ? Icons.check_circle : Icons.warning,
+            color: isHealthy ? Colors.green : Colors.orange,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isHealthy ? "Healthy Plant" : "Disease Detected",
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                Text(
+                  timeAgo,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFocusIndicator() {
-    return const SizedBox.shrink();
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 0) {
+      return "${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago";
+    } else if (difference.inHours > 0) {
+      return "${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago";
+    } else if (difference.inMinutes > 0) {
+      return "${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago";
+    } else {
+      return "Just now";
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          return _hasError
-              ? _buildErrorState()
-              : Stack(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Text(
+          "Plant Disease Detector",
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.grey.shade800,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: Colors.grey.shade200,
+            height: 1,
+          ),
+        ),
+      ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          child: Column(
             children: [
-              Positioned.fill(
-                child: _buildCameraPreview(),
-              ),
-
-              // Camera Grid Overlay
-              if (_showGrid)
-                Positioned.fill(
-                  child: _buildCameraGrid(),
-                ),
-
-              // Focus Indicator
-              Positioned.fill(
-                child: _buildFocusIndicator(),
-              ),
-
-              // Top Bar
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _buildTopBar(),
-              ),
-
-              // Bottom Controls
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: _buildControlBar(),
-              ),
+              _buildInstructions(),
+              _buildActionButtons(),
+              _buildImagePreview(),
+              _buildResult(),
+              _buildRecentAnalysis(),
+              const SizedBox(height: 20),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
-}
-
-class ResponsiveGridPainter extends CustomPainter {
-  final BuildContext context;
-
-  ResponsiveGridPainter(this.context);
-
-  double _getResponsiveStrokeWidth() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final scaleFactor = screenWidth / 375; // Base width
-    return (1.0 * scaleFactor).clamp(0.5, 2.0);
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
-      ..strokeWidth = _getResponsiveStrokeWidth();
-
-    final double horizontalSpacing = size.height / 3;
-    final double verticalSpacing = size.width / 3;
-
-    for (int i = 1; i < 3; i++) {
-      canvas.drawLine(
-        Offset(0, i * horizontalSpacing),
-        Offset(size.width, i * horizontalSpacing),
-        paint,
-      );
-    }
-
-    for (int i = 1; i < 3; i++) {
-      canvas.drawLine(
-        Offset(i * verticalSpacing, 0),
-        Offset(i * verticalSpacing, size.height),
-        paint,
-      );
-    }
-
-    final centerPaint = Paint()
-      ..color = Colors.white.withOpacity(0.5)
-      ..strokeWidth = _getResponsiveStrokeWidth() * 2;
-
-    const double centerMarkSize = 10;
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-
-    canvas.drawLine(
-      Offset(centerX - centerMarkSize, centerY),
-      Offset(centerX + centerMarkSize, centerY),
-      centerPaint,
-    );
-    canvas.drawLine(
-      Offset(centerX, centerY - centerMarkSize),
-      Offset(centerX, centerY + centerMarkSize),
-      centerPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -18,7 +18,7 @@ class AdvisoryScreen extends StatefulWidget {
 
 class _AdvisoryScreenState extends State<AdvisoryScreen>
     with TickerProviderStateMixin {
-  static const String _baseUrl = 'http://10.0.2.2:3000';
+  static const String _baseUrl = 'http://51.75.31.246:3000';
 
   bool _isLoading = false;
   bool _isLoadingAdvisory = false;

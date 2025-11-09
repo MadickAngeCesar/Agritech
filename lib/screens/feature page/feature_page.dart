@@ -502,8 +502,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _startListening() async {
     bool available = await _speech.initialize(
-      onStatus: (val) => print('🟡 Status: $val'),
-      onError: (val) => print('🔴 Error: $val'),
+      onStatus: (val) {
+        print('🟡 Status: $val');
+        if (val == 'done' || val == 'notListening') {
+          _stopListening();
+        }
+      },
+      onError: (val) {
+        print('🔴 Speech error: $val');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Speech error: ${val.errorMsg ?? val.toString()}")),
+        );
+        setState(() => _isListening = false);
+      },
     );
 
     if (available) {
@@ -515,13 +526,24 @@ class _HomeScreenState extends State<HomeScreen> {
             _searchText = text;
             _searchController.text = text;
           });
-          _handleVoiceCommand(text.toLowerCase());
+          if (val.finalResult) {
+            _handleVoiceCommand(text.toLowerCase());
+            _stopListening();
+          }
         },
+        listenMode: stt.ListenMode.dictation,
+        partialResults: true,
         listenFor: const Duration(seconds: 30),
         pauseFor: const Duration(seconds: 3),
       );
+    } else {
+      print('Speech recognition unavailable.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Speech recognition unavailable on this device.")),
+      );
     }
   }
+
 
   void _stopListening() {
     _speech.stop();
@@ -529,24 +551,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _handleVoiceCommand(String command) {
-    command = command.toLowerCase();
+    print("🎤 Voice command received: $command");
 
     final matchingSuggestion = _searchSuggestions.firstWhere(
-          (suggestion) =>
-          suggestion.keywords.any((keyword) => command.contains(keyword)),
-      orElse: () =>
-          SearchSuggestion(
-            title: 'No match found',
-            subtitle: '',
-            icon: Icons.error,
-            keywords: [],
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(
-                    "⚠️ Sorry, I didn't understand: \"$command\"")),
-              );
-            },
-          ),
+          (suggestion) => suggestion.keywords.any(
+            (keyword) => command.contains(keyword),
+      ),
+      orElse: () => SearchSuggestion(
+        title: 'No match found',
+        subtitle: '',
+        icon: Icons.error,
+        keywords: [],
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("⚠️ No match found for: \"$command\"")),
+          );
+        },
+      ),
     );
 
     matchingSuggestion.onTap();
@@ -559,8 +580,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-
-    _stopListening();
   }
 
   Future<void> _determinePosition() async {
@@ -604,18 +623,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchTopCrops() async {
-    final url = 'http://10.0.2.2:3000/api/categories/top';
+    final url = 'http://51.75.31.246:3000/api/products';
     final response = await http.get(
       Uri.parse(url),
-      headers: { 'Authorization': 'Bearer ${widget.token}'},
+      headers: { 'Authorization': 'Bearer ${widget.token}' },
     );
+
     if (response.statusCode == 200) {
-      setState(() => _topCrops = json.decode(response.body));
+      final List<dynamic> data = json.decode(response.body);
+      setState(() {
+        _topCrops = data.take(5).toList();
+      });
+    } else {
+      print("Error fetching top crops: ${response.body}");
     }
   }
 
   Future<void> _fetchMarketDemand() async {
-    final url = 'http://10.0.2.2:3000/api/market/demands/today';
+    final url = 'http://51.75.31.246:3000/api/market/demands/today';
     final response = await http.get(
       Uri.parse(url),
       headers: { 'Authorization': 'Bearer ${widget.token}'},
@@ -627,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchRandomVideo() async {
-    final url = 'http://10.0.2.2:3000/api/videos/random';
+    final url = 'http://51.75.31.246:3000/api/videos/random';
     final response = await http.get(
       Uri.parse(url),
       headers: { 'Authorization': 'Bearer ${widget.token}'},
@@ -1347,18 +1372,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               TextButton.icon(
-                onPressed: () =>
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            MarketplaceScreen(
-                              userData: widget.userData,
-                              token: widget.token,
-                              categoryId: 0,
-                            ),
-                      ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MarketplaceScreen(
+                      userData: widget.userData,
+                      token: widget.token,
+                      categoryId: 0,
                     ),
+                  ),
+                ),
                 icon: Icon(
                   Icons.arrow_forward,
                   color: primaryGreen,
@@ -1376,7 +1399,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           SizedBox(height: ResponsiveUtils.getSpacing(context)),
-          ResponsiveUtils.isDesktop(context)
+
+          // New: handle loading state
+          _topCrops.isEmpty
+              ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(
+                color: primaryGreen,
+                strokeWidth: 3,
+              ),
+            ),
+          )
+              : ResponsiveUtils.isDesktop(context)
               ? _buildCropsGrid()
               : _buildCropsHorizontalList(),
         ],
@@ -1417,55 +1452,76 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCropItem(dynamic crop) {
-    final cropSize = ResponsiveUtils.isDesktop(context) ? 80.0 : ResponsiveUtils
-        .isTablet(context) ? 75.0 : 70.0;
+    final cropSize = ResponsiveUtils.isDesktop(context)
+        ? 80.0
+        : ResponsiveUtils.isTablet(context)
+        ? 75.0
+        : 70.0;
 
-    return Column(
-      children: [
-        Container(
-          width: cropSize,
-          height: cropSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: accentGreen.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipOval(
-            child: Image.network(
-              crop['image'] ??
-                  'https://via.placeholder.com/100x100.png?text=No+Image',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) =>
-                  Container(
-                    color: softGreen,
-                    child: Icon(
-                      Icons.eco,
-                      color: primaryGreen,
-                      size: ResponsiveUtils.isDesktop(context) ? 36 : 30,
-                    ),
-                  ),
+    final imageUrl = crop['images'] != null && crop['images'].isNotEmpty
+        ? crop['images'][0]
+        : 'https://via.placeholder.com/100x100.png?text=No+Image';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MarketplaceScreen(
+              userData: widget.userData,
+              token: widget.token,
+              categoryId: 0,
             ),
           ),
-        ),
-        SizedBox(height: ResponsiveUtils.getSpacing(
-            context, mobile: 8, tablet: 10, desktop: 12)),
-        Text(
-          crop['name'] ?? 'Unknown',
-          style: GoogleFonts.poppins(
-            fontSize: ResponsiveUtils.getBodyFontSize(context) - 2,
-            fontWeight: FontWeight.w500,
-            color: darkGreen,
+        );
+      },
+      child: Column(
+        children: [
+          Container(
+            width: cropSize,
+            height: cropSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: accentGreen.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: softGreen,
+                  child: Icon(
+                    Icons.eco,
+                    color: primaryGreen,
+                    size: ResponsiveUtils.isDesktop(context) ? 36 : 30,
+                  ),
+                ),
+              ),
+            ),
           ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+          SizedBox(
+            height: ResponsiveUtils.getSpacing(
+                context, mobile: 8, tablet: 10, desktop: 12),
+          ),
+          Text(
+            crop['name'] ?? 'Unknown',
+            style: GoogleFonts.poppins(
+              fontSize: ResponsiveUtils.getBodyFontSize(context) - 2,
+              fontWeight: FontWeight.w500,
+              color: darkGreen,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 

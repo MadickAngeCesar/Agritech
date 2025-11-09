@@ -14,7 +14,7 @@ class EbookScreen extends StatefulWidget {
 }
 
 class _EbookScreenState extends State<EbookScreen> with SingleTickerProviderStateMixin {
-  final String baseUrl = "http://10.0.2.2:3000/api";
+  final String baseUrl = "http://51.75.31.246:3000/api";
   late TabController _tabController;
   List<dynamic> categories = [];
   List<dynamic> allEbooks = [];

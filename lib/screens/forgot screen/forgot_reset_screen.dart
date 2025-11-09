@@ -24,7 +24,7 @@ class _ForgotResetScreenState extends State<ForgotResetScreen>
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
-  final String baseUrl = 'http://10.0.2.2:3000/api/auth';
+  final String baseUrl = 'http://51.75.31.246:3000/api/auth';
 
   AnimationController? _fadeController;
   AnimationController? _slideController;

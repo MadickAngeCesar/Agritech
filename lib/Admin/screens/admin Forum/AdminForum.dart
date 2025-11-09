@@ -28,7 +28,7 @@ class _AdminForumScreenState extends State<AdminForumScreen> with SingleTickerPr
   File? _selectedImage;
   bool _isComposingMessage = false;
 
-  final String baseUrl = 'http://10.0.2.2:3000';
+  final String baseUrl = 'http://51.75.31.246:3000';
   final TextEditingController searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 

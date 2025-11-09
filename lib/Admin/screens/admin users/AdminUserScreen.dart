@@ -26,7 +26,7 @@ class _AdminUserScreenState extends State<AdminUserScreen>
   String _searchQuery = '';
   bool _isSearching = false;
 
-  final String baseUrl = 'http://10.0.2.2:3000';
+  final String baseUrl = 'http://51.75.31.246:3000';
 
   // Modern Agriculture Theme Colors
   static const Color primaryGreen = Color(0xFF4CAF50);

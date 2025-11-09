@@ -29,7 +29,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
     setState(() => isLoading = true);
     final token = await getToken();
     final response = await http.get(
-      Uri.parse('http://10.0.2.2:3000/api/admins'),
+      Uri.parse('http://51.75.31.246:3000/api/admins'),
       headers: {'Authorization': 'Bearer $token'},
     );
 
@@ -49,7 +49,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
     setState(() => isLoading = true);
     final token = await getToken();
     final response = await http.post(
-      Uri.parse('http://10.0.2.2:3000/api/admins/add'),
+      Uri.parse('http://51.75.31.246:3000/api/admins/add'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
@@ -90,7 +90,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
               setState(() => isLoading = true);
               final token = await getToken();
               final response = await http.delete(
-                Uri.parse('http://10.0.2.2:3000/api/admins/$id'),
+                Uri.parse('http://51.75.31.246:3000/api/admins/$id'),
                 headers: {'Authorization': 'Bearer $token'},
               );
 

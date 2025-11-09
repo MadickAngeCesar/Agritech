@@ -33,7 +33,7 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
     setState(() => isLoading = true);
 
     final response = await http.get(
-      Uri.parse('http://10.0.2.2:3000/api/my-products'),
+      Uri.parse('http://51.75.31.246:3000/api/my-products'),
       headers: {'Authorization': 'Bearer ${widget.token}'},
     );
 
@@ -100,7 +100,7 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
 
   Future<void> deleteProduct(int productId) async {
     final response = await http.delete(
-      Uri.parse('http://10.0.2.2:3000/api/my-products/$productId'),
+      Uri.parse('http://51.75.31.246:3000/api/my-products/$productId'),
       headers: {'Authorization': 'Bearer ${widget.token}'},
     );
 
@@ -231,7 +231,7 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
             }
 
             String? imageUrl = imageList.isNotEmpty
-                ? 'http://10.0.2.2:3000${imageList[0]}'
+                ? 'http://51.75.31.246:3000${imageList[0]}'
                 : null;
 
             return Container(

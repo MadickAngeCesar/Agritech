@@ -7,6 +7,9 @@ class Ebook {
   final String? fileUrl;
   final int categoryId;
   final String? categoryName;
+  final String? authorName;          // NEW
+  final int ratingsCount;            // NEW
+  final double ratingsAverage;       // NEW
   final bool isApproved;
   final bool isPurchased;
   final DateTime? createdAt;
@@ -22,6 +25,9 @@ class Ebook {
     this.fileUrl,
     required this.categoryId,
     this.categoryName,
+    this.authorName,                  // NEW
+    this.ratingsCount = 0,            // NEW
+    this.ratingsAverage = 0.0,        // NEW
     this.isApproved = false,
     this.isPurchased = false,
     this.createdAt,
@@ -39,6 +45,9 @@ class Ebook {
       fileUrl: json['file_url'],
       categoryId: json['category_id'] ?? 0,
       categoryName: json['category_name'],
+      authorName: json['User']?['full_name'],          // NEW
+      ratingsCount: json['ratings_count'] ?? 0,        // NEW
+      ratingsAverage: (json['ratings_average'] ?? 0).toDouble(),  // NEW
       isApproved: json['approved'] ?? false,
       isPurchased: json['isPurchased'] ?? false,
       purchaseDate: json['purchaseDate'] != null
@@ -63,6 +72,9 @@ class Ebook {
       if (fileUrl != null) 'file_url': fileUrl,
       'category_id': categoryId,
       if (categoryName != null) 'category_name': categoryName,
+      if (authorName != null) 'author_name': authorName,
+      'ratings_count': ratingsCount,
+      'ratings_average': ratingsAverage,
       'approved': isApproved,
       'isPurchased': isPurchased,
       if (purchaseDate != null) 'purchaseDate': purchaseDate!.toIso8601String(),

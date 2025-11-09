@@ -67,33 +67,43 @@ class _EducationalLibraryScreenState extends State<EducationalLibraryScreen>
   static const double extraLargeDesktopBreakpoint = 1920;
 
   @override
+  @override
   void initState() {
     super.initState();
     _apiService = ApiService(token: widget.token);
-
-    // Initialize animations with device-specific durations
-    _sidebarAnimationController = AnimationController(
-      duration: Duration(milliseconds: _getAnimationDuration()),
-      vsync: this,
-    );
-
     _fadeAnimationController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-
-    _sidebarAnimation = CurvedAnimation(
-      parent: _sidebarAnimationController,
-      curve: Curves.easeInOutCubic,
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeAnimationController,
-      curve: Curves.easeInOut,
-    );
-
-    _initializeData();
   }
+
+  bool _animationsInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_animationsInitialized) {
+      _sidebarAnimationController = AnimationController(
+        duration: Duration(milliseconds: _getAnimationDuration()),
+        vsync: this,
+      );
+
+      _sidebarAnimation = CurvedAnimation(
+        parent: _sidebarAnimationController,
+        curve: Curves.easeInOutCubic,
+      );
+
+      _fadeAnimation = CurvedAnimation(
+        parent: _fadeAnimationController,
+        curve: Curves.easeInOut,
+      );
+
+      _animationsInitialized = true;
+      _initializeData();
+    }
+  }
+
 
   @override
   void dispose() {

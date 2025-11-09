@@ -26,7 +26,7 @@ class _ChatBotScreenState extends State<ChatBotScreen>
   late AnimationController _animationController;
 
   /// Update this for your server environment
-  final String apiUrl = "http://10.0.2.2:3000/api/chatbot";
+  final String apiUrl = "http://51.75.31.246:3000/api/chatbot";
 
   // AgriTech color scheme
   static const Color primaryGreen = Color(0xFF2E7D32);

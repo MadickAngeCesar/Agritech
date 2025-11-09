@@ -68,7 +68,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
       });
 
       final res = await http.get(
-        Uri.parse('http://10.0.2.2:3000/api/categories'),
+        Uri.parse('http://51.75.31.246:3000/api/categories'),
       );
 
       if (res.statusCode == 200) {
@@ -106,7 +106,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
     try {
       final res = await http.get(
         Uri.parse(
-          'http://10.0.2.2:3000/api/market/category-trend?category_id=$selectedCategoryId&from=$fromStr&to=$toStr',
+          'http://51.75.31.246:3000/api/market/category-trend?category_id=$selectedCategoryId&from=$fromStr&to=$toStr',
         ),
         headers: {'Content-Type': 'application/json'},
       );
@@ -135,7 +135,7 @@ class _MarketUpdatesScreenState extends State<MarketUpdatesScreen>
   }
 
   Future<void> fetchMarketUpdates() async {
-    const baseUrl = 'http://10.0.2.2:3000/api/market';
+    const baseUrl = 'http://51.75.31.246:3000/api/market';
 
     try {
       setState(() {

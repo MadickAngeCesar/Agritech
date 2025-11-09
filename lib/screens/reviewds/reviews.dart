@@ -89,7 +89,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
     _submitAnimationController.forward();
 
     try {
-      final uri = Uri.parse("http://10.0.2.2:3000/feedback/submit");
+      final uri = Uri.parse("http://51.75.31.246:3000/feedback/submit");
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},

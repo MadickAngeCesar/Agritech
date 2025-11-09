@@ -29,7 +29,7 @@ class _ForumScreenState extends State<ForumScreen> with SingleTickerProviderStat
   File? _selectedImage;
   final TextEditingController _postController = TextEditingController();
 
-  final String baseUrl = 'http://10.0.2.2:3000';
+  final String baseUrl = 'http://51.75.31.246:3000';
 
   // AgriTech Color Palette
   static const Color primaryGreen = Color(0xFF2E7D32);
@@ -73,13 +73,13 @@ class _ForumScreenState extends State<ForumScreen> with SingleTickerProviderStat
         print('🔧 Fixed doubled base URL: "$cleanPath"');
       }
 
-      // Check for malformed URLs like "http://10.0.2.2:3000uploads/"
+      // Check for malformed URLs like "http://51.75.31.246:3000uploads/"
       if (cleanPath.contains('${baseUrl}uploads/') && !cleanPath.contains('$baseUrl/uploads/')) {
         cleanPath = cleanPath.replaceFirst('${baseUrl}uploads/', '$baseUrl/uploads/');
         print('🔧 Fixed missing slash in uploads: "$cleanPath"');
       }
 
-      // Fix port issues like "http://10.0.2.2:30001750101703312"
+      // Fix port issues like "http://51.75.31.246:30001750101703312"
       RegExp portIssueRegex = RegExp(r'http://[\d\.]+:3000(\d+.*)');
       if (portIssueRegex.hasMatch(cleanPath)) {
         cleanPath = cleanPath.replaceAllMapped(portIssueRegex, (match) {

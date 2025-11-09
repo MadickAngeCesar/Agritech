@@ -47,7 +47,7 @@ class _NotificationScreenState extends State<NotificationScreen>
   }
 
   Future<void> fetchNotifications() async {
-    final url = Uri.parse("http://10.0.2.2:3000/notifications/${widget.userId}");
+    final url = Uri.parse("http://51.75.31.246:3000/notifications/${widget.userId}");
 
     try {
       setState(() {

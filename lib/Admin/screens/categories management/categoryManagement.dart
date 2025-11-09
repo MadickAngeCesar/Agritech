@@ -17,8 +17,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   List categories = [];
   bool isLoading = true;
 
-  final categoryUrl = 'http://10.0.2.2:3000/api/categories';
-  final subCategoryUrl = 'http://10.0.2.2:3000/api/subcategories';
+  final categoryUrl = 'http://51.75.31.246:3000/api/categories';
+  final subCategoryUrl = 'http://51.75.31.246:3000/api/subcategories';
 
   // Color scheme
   final Color primaryColor = Color(0xFF2E7D32); // Deep green

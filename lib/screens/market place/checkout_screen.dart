@@ -41,7 +41,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void initState() {
     super.initState();
     _apiService = ApiService(
-      baseUrl: 'http://10.0.2.2:3000', // Replace with your actual API URL
+      baseUrl: 'http://51.75.31.246:3000', // Replace with your actual API URL
       token: widget.token,
     );
 

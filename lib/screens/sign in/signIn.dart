@@ -126,7 +126,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
       if (user != null) {
         final response = await http.post(
-          Uri.parse('http://10.0.2.2:3000/api/auth/google-login'),
+          Uri.parse('http://51.75.31.246:3000/api/auth/google-login'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'email': user.email,
@@ -171,7 +171,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
       try {
         final response = await http.post(
-          Uri.parse('http://10.0.2.2:3000/api/auth/login'),
+          Uri.parse('http://51.75.31.246:3000/api/auth/login'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
         );

@@ -13,7 +13,7 @@ class AdminEbookModerationScreen extends StatefulWidget {
 
 class _AdminEbookModerationScreenState extends State<AdminEbookModerationScreen>
     with TickerProviderStateMixin {
-  final String baseUrl = 'http://10.0.2.2:3000/api';
+  final String baseUrl = 'http://51.75.31.246:3000/api';
   List<dynamic> pendingEbooks = [];
   bool isLoading = true;
   late AnimationController _fadeController;
