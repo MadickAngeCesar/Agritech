@@ -1101,7 +1101,7 @@ class _AdminProductScreenState extends State<AdminProductScreen> {
             ),
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: const CardThemeData(
           color: AppColors.cardBackground,
         ),
         colorScheme: ColorScheme.fromSwatch().copyWith(
